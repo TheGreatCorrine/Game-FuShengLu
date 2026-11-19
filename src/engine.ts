@@ -1,9 +1,10 @@
+import { eligible } from './content/western-han/events.ts'
+export { eligible }
 import { scheduleYear, record } from './engine/scheduler.ts'
 import { changeOccupation, confirmedName, payHouseDebt } from './engine/operations.ts'
 import { account, withAccountViews } from './engine/accounts.ts'
 import {
   participant,
-  allowed,
   negotiate,
   candidate,
   narrative,
@@ -18,7 +19,7 @@ import {
   repay,
   spendable,
 } from './engine/legal.ts'
-import { history, homes, regions, rules, scenes } from './data.ts'
+import { homes, regions, rules } from './data.ts'
 import type { Action } from './data.ts'
 import { random, weighted } from './engine/rng.ts'
 import type { State, Kin } from './engine/types.ts'
@@ -125,60 +126,6 @@ export function support(s: State, n: Kin) {
         0.08 * Number(s.sex === '女' && homes[s.home].books === 0),
     ),
   )
-}
-export function eligible(s: State) {
-  return scenes
-    .filter(
-      (e) =>
-        (e.id !== 'studyConflict' ||
-          (s.training === '习读' &&
-            account(s).debt > 0 &&
-            participant(s, 'turn')?.goal === '积谷' &&
-            ['father', 'mother'].includes(participant(s, 'turn')!.id))) &&
-        (e.id !== 'medicine' || !!participant(s, 'medicine')) &&
-        (e.id !== 'personalLoan' || s.purse < 16 || account(s).debt > 0) &&
-        (e.id !== 'collect' ||
-          (s.age >= s.nextCollection &&
-            s.loans.some(
-              (l) => l.debtor === 'player' && l.balance > 0 && l.due <= s.year,
-            ))) &&
-        (e.id !== 'demand' ||
-          (s.residence !== 'birth' && (s.households.birth?.debt ?? 0) > 0)) &&
-        s.name &&
-        !s.dead &&
-        s.age >= e.min &&
-        s.age <= e.max &&
-        (!s.seen.includes(e.id) || e.id === 'wedding' || e.id === 'collect') &&
-        (e.id !== 'relief' ||
-          (account(s).debt >= 8 &&
-            living(s).some(
-              (n) => n.house === s.residence && n.age >= 16 && n.money > 0,
-            ))) &&
-        (e.id !== 'letterHome' ||
-          (s.residence !== 'birth' &&
-            (s.households.birth?.debt ?? 0) >= 8 &&
-            s.purse >= 1 &&
-            living(s).some((n) => n.house === 'birth'))) &&
-        (e.id !== 'wedding' || s.age >= s.wedding.next) &&
-        (!e.gate ||
-          {
-            books: homes[s.home].books > 0,
-            kin: living(s).some((n) => n.house === s.residence),
-            trained: s.training === '学成',
-            single:
-              s.age >= rules.marriageAge &&
-              !s.spouse &&
-              (s.marriage === 'widowed'
-                ? s.age <= rules.family.widowAgeLimit
-                : s.age <= 34),
-            trade: s.home === 2,
-          }[e.gate]),
-    )
-    .map((e) => ({
-      ...e,
-      choices: e.choices.filter(([, a]) => allowed(s, e.id, a)),
-    }))
-    .filter((e) => e.choices.length > 0)
 }
 export function advance(input: State, onCandidateDeath?: (person: Kin) => void): State {
   if (!input.name || input.dead || input.pending) return input

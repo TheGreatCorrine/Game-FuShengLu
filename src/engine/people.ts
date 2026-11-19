@@ -64,7 +64,7 @@ function playerUnions(g: Graph) {
   return g.marriages.filter(u=>u.pair.includes(g.playerId))
 }
 
-function marriageSummary(g: Graph): State['marriage'] {
+export function marriageSummary(g: Graph): State['marriage'] {
   const list = playerUnions(g)
   const last = list.at(-1)
   if (!last) return 'never'
