@@ -5,7 +5,7 @@ import { homes, rules } from '../data.ts'
 import { random } from './rng.ts'
 import { annualHealth } from './mortality.ts'
 import { account, openHouse, moveResidence } from './accounts.ts'
-export function kin(s: State, role: string, age: number, id: string): Kin {
+export function kin(s: Pick<State,'seed'|'sex'|'year'|'residence'|'home'|'surname'>, role: string, age: number, id: string): Kin {
   const roll = (k: string) => random(s.seed, id + k)
   return {
     sex:

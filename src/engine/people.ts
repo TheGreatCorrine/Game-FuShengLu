@@ -3,7 +3,7 @@ import type { Kin, Memory, State } from './types.ts'
 
 type PersonId = string
 type Attitude = Pick<Kin, 'trust' | 'closeness' | 'conflict' | 'history'>
-type Relative = Omit<Kin, 'parents' | 'partner' | 'history' | 'trust' | 'closeness' | 'conflict' | 'house'> & {
+export type Relative = Omit<Kin, 'parents' | 'partner' | 'history' | 'trust' | 'closeness' | 'conflict' | 'house'> & {
   kind: 'relative'
   house: string | null
 }

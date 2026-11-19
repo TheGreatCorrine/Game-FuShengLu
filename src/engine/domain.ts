@@ -1,0 +1,41 @@
+import { protagonist, type Life, type Relative } from './people.ts'
+import type { Kin, State } from './types.ts'
+
+/** Public flat clients and native Life commands share domain procedures. */
+export type Game = Life | State
+export type Person = Relative | Kin
+export const canonical = (s: Game): s is Life => 'people' in s
+export const player = (s: Game) => canonical(s) ? protagonist(s) : s
+export const playerId = (s: Game) => canonical(s) ? s.playerId : 'player'
+export function relative(s: Life, id: string) {
+  const n = s.people[id]
+  if (n?.kind !== 'relative') throw Error('Unknown relative: ' + id)
+  return n
+}
+export const residents = (s: Game): Person[] =>
+  canonical(s) ? s.residentOrder.map(id => relative(s,id)) : s.npcs
+export const keyFor = (s: Game,id:string) => canonical(s) ? s.legacyKeys[id] : id
+export function attitude(s: Game,n: Person) {
+  if (canonical(s)) return s.towardPlayer[n.id]
+  if ('trust' in n) return n
+  throw Error('Missing attitude: ' + n.id)
+}
+
+export function register(s: Game, template: Kin, parents: string[], external = false): Person {
+  if (!canonical(s)) {
+    template.parents = parents
+    if (!external) s.npcs.push(template)
+    return template
+  }
+  const {id:key, trust, closeness, conflict, history, partner, parents:unused, ...facts} = template
+  const id = 'p' + s.nextPerson++
+  if (Object.hasOwn(s.people,id) || Object.values(s.legacyKeys).includes(key))
+    throw Error('Duplicate person: '+key)
+  const n: Relative = {...facts, id, kind:'relative', house: external ? null : facts.house}
+  s.people[id] = n
+  s.parentIds[id] = parents
+  s.towardPlayer[id] = {trust,closeness,conflict,history}
+  s.legacyKeys[id] = key
+  if (!external) s.residentOrder.push(id)
+  return n
+}

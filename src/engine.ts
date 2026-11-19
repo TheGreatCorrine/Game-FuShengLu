@@ -1,3 +1,5 @@
+import { generate as birth } from './engine/birth.ts'
+import { legacyPeopleView } from './engine/people.ts'
 import { eligible } from './content/western-han/events.ts'
 export { eligible }
 import { scheduleYear, record } from './engine/scheduler.ts'
@@ -35,70 +37,10 @@ import {
 export { yearImpact } from './engine/economy.ts'
 export { random }
 export type { State, Kin }
-export function generate(
-  seed: string,
-  overrides: Partial<Mortality> = {},
-): State {
-  const r = (k: string) => random(seed, k)
-  const region = Math.floor(r('region') * regions.length),
-    home = weighted(rules.weights[region], r('home')),
-    birth = 1 - rules.birthBCE[Math.floor(r('birth') * 4)]
-  const s = withAccountViews({
-    loans: [],
-    settlements: [],
-    nextCollection: 0,
-    seed,
-    mortality: configure(overrides),
-    vulnerability: r('vulnerability'),
-    acute: '',
-    risk: 0,
-    practice: 0,
-    households: { birth: { cash: homes[home].coins + Math.floor(r('cash') * 20), assets: home === 1 ? 0 : home === 0 ? 2 : 1, debt: 0 } },
-    residence: 'birth',
-    closedHouses: {},
-    candidate: null,
-    promise: null,
-    careYear: null,
-    heads: { birth: 'father' },
-    spouse: null,
-    unions: 0,
-    marriage: 'never',
-    lastBirth: null,
-    wedding: { state: 'eligible', attempts: 0, next: 0 },
-    env: { trade: 1, price: 1, harvest: 1, disease: 0.12 },
-    birth,
-    year: birth,
-    age: 0,
-    region,
-    home,
-    surname: ['陈', '李', '张', '王', '郑', '田'][Math.floor(r('surname') * 6)],
-    name: '',
-    sex: r('sex') < 0.5 ? '女' : '男',
-    health: 80 + Math.floor(r('health') * 20),
-    talent: r('ability'),
-    skill: 0,
-    purse: 0,
-    income: 0,
-    expenses: 0,
-    work: '幼年',
-    dead: false,
-    npcs: [],
-    news: [],
-    chronicle: [],
-    ledger: [],
-    seen: [],
-    pending: '',
-    training: '',
-    queue: [],
-    exposure: [],
-  })
-  const sibling = 1 + Math.floor(r('sib') * 7)
-  s.npcs = [
-    kin(s, '父亲', 25 + sibling + Math.floor(r('father') * 12), 'father'),
-    kin(s, '母亲', 20 + sibling + Math.floor(r('mother') * 10), 'mother'),
-    kin(s, '手足', sibling, 'sibling'),
-  ]
-  return s
+export function generate(...args: Parameters<typeof birth>) {
+  const projected = legacyPeopleView(birth(...args))
+  const {playerParentKeys, ...flat} = structuredClone(projected)
+  return withAccountViews(flat)
 }
 export function confirmName(s: State, name: string) {
   return withAccountViews({ ...structuredClone(s), name: confirmedName(s.name, name) })

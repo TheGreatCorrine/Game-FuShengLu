@@ -9,9 +9,7 @@ import type { Kin } from './types.ts'
 import type { Action } from '../data.ts'
 
 export { legacyPeopleView, migratePeople, validatePeople } from './people.ts'
-export function generate(...args: Parameters<typeof legacy.generate>) {
-  return collectPeople(legacy.generate(...args))
-}
+export { generate } from './birth.ts'
 export function confirmName(s: Life, name: string) {
   const value = confirmedName(protagonist(s).name, name)
   const next = structuredClone(s)
