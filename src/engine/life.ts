@@ -1,6 +1,6 @@
 import { ageResidents } from './family.ts'
 import { confirmedName } from './operations.ts'
-import { scheduleYear } from './scheduler.ts'
+import { beginYear, continueYear } from './scheduler.ts'
 import { withAccountViews } from './accounts.ts'
 import * as legacy from '../engine.ts'
 import { collectPeople, legacyPeopleView, protagonist } from './people.ts'
@@ -20,20 +20,11 @@ export function advance(s: Life) {
   const p = protagonist(s)
   if (!p.name || p.dead || s.pending) return s
   let lost: Kin | undefined
-  const player = { ...p }
-  const draft = { ...s, people: { ...s.people, [s.playerId]: player } }
-  const residents = draft.residentOrder.map(id => {
-    const n = draft.people[id]
-    if (n?.kind !== 'relative') throw Error('Invalid resident: ' + id)
-    const resident = { ...n }
-    draft.people[id] = resident
-    return resident
-  })
-  const next = scheduleYear(draft, player, s.legacyKeys[s.playerId],
-    () => ageResidents(draft, residents, id => draft.legacyKeys[id]),
-    () => withAccountViews(structuredClone(legacyPeopleView(draft))), legacy.eligible,
-    n => { lost = n })
-  return collectPeople(next,s,lost)
+  const draft = structuredClone(s)
+  beginYear(draft)
+  const next = continueYear(withAccountViews(structuredClone(legacyPeopleView(draft))),
+    legacy.eligible, n => { lost = n })
+  return collectPeople(next,draft,lost)
 }
 export function decide(s: Life, action: Action) {
   return collectPeople(legacy.decide(legacyPeopleView(s),action),s)

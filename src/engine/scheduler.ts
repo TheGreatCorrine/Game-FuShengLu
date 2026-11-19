@@ -1,7 +1,8 @@
+import { player, playerId, keyFor, residents, type Game } from './domain.ts'
 import { account } from './accounts.ts'
 import { environmentFor, household } from './economy.ts'
 import { candidate, fulfill } from './encounters.ts'
-import { developFamily, finishResidentDeaths } from './family.ts'
+import { ageResidents, developFamily, finishResidentDeaths } from './family.ts'
 import { livelihood } from './livelihood.ts'
 import { annualHealth } from './mortality.ts'
 import { changeOccupation } from './operations.ts'
@@ -33,25 +34,21 @@ function mature(s: State) {
   }
   s.queue = s.queue.filter((q) => q.age > s.age)
 }
-type YearWorld = Pick<State, 'year'|'region'|'env'|'seed'|'mortality'|'households'|'pending'>
-type Player = Pick<State, 'name'|'age'|'dead'|'health'|'acute'|'risk'|'vulnerability'|'home'|'residence'>
+export function beginYear(s: Game) {
+  const p = player(s)
+  if (!p.name || p.dead || s.pending) throw Error('Year cannot advance')
+  const key = keyFor(s,playerId(s))
+  if (!key) throw Error('Missing player health key')
+  p.age++
+  s.year++
+  s.env = environmentFor(s,p)
+  Object.assign(p,annualHealth(p.age,p.health,p.vulnerability,s.env.disease,account(s).debt > 0,
+    k => random(s.seed,key+k+s.year),s.mortality))
+  finishResidentDeaths(s,ageResidents(s,residents(s),id => keyFor(s,id)))
+}
 
-// The caller owns the draft. Legacy domains receive it only after resident health.
-export function scheduleYear(world: YearWorld, player: Player, rngKey: string,
-  residentHealth: () => string[], workingState: () => State, events: (s: State) => {id:string; weight:number}[],
+export function continueYear(s: State, events: (s: State) => {id:string; weight:number}[],
   onCandidateDeath?: (person: Kin) => void): State {
-  if (!player.name || player.dead || world.pending) throw Error('Year cannot advance')
-  if (!rngKey || !Object.hasOwn(world.households, player.residence))
-    throw Error('Missing player health context')
-  player.age++
-  world.year++
-  world.env = environmentFor(world, player)
-  Object.assign(player, annualHealth(player.age, player.health, player.vulnerability,
-    world.env.disease, world.households[player.residence].debt > 0,
-    k => random(world.seed, rngKey + k + world.year), world.mortality))
-  const deaths = residentHealth()
-  const s = workingState()
-  finishResidentDeaths(s, deaths)
   household(s)
   if (!s.dead) developFamily(s)
   if (!s.health) {

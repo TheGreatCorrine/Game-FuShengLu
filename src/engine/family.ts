@@ -1,3 +1,4 @@
+import { player, playerId, residents, partnerOf, endUnion, type Game } from './domain.ts'
 import { payHouseDebt, changeOccupation, transferSavings } from './operations.ts'
 import { authority, settle, borrow, outstanding, repay } from './legal.ts'
 import type { State, Kin } from './types.ts'
@@ -50,8 +51,8 @@ export function kin(s: Pick<State,'seed'|'sex'|'year'|'residence'|'home'|'surnam
     memories: [],
   }
 }
-const note = (s: State, text: string) =>
-  s.chronicle.push({ age: s.age, year: s.year, text })
+const note = (s: Game, text: string) =>
+  s.chronicle.push({ age: player(s).age, year: s.year, text })
 const clamp = (v: number) => Math.min(1, Math.max(0, v))
 export function remember(s: State, n: Kin, id: string, trust: number) {
   if (!n.alive || (!s.npcs.includes(n) && s.candidate !== n) || !id || !Number.isFinite(trust))
@@ -172,7 +173,7 @@ export function ageResidents(world: HealthWorld, residents: Resident[], keyFor: 
     n.acute = outcome.acute
     if (outcome.dead) {
       n.alive = false
-      deaths.push(key)
+      deaths.push(n.id)
     }
   }
   return deaths
@@ -182,32 +183,24 @@ export function resolveKinHealth(s: State) {
   finishResidentDeaths(s, ageResidents(s, s.npcs, id => id))
 }
 
-export function finishResidentDeaths(s: State, deaths: string[]) {
+export function finishResidentDeaths(s: Game, deaths: string[]) {
+  const p = player(s), pid = playerId(s)
   for (const id of deaths) {
-    const n = s.npcs.find(person => person.id === id)
+    const n = residents(s).find(person => person.id === id)
     if (!n || n.alive) throw Error('Invalid resident death: ' + id)
     note(s, n.role + ' ' + n.name + ' 离世。')
-    if (n.partner && n.partner !== 'player') {
-      const survivor = s.npcs.find((k) => k.id === n.partner)
-      if (survivor) survivor.partner = null
-      n.partner = null
-    }
-    if (n.id === s.spouse) {
-      n.partner = null
-      s.spouse = null
-      s.marriage = 'widowed'
+    const spouse = partnerOf(s,id)
+    if (spouse) endUnion(s,id,'widowed')
+    if (spouse === pid) {
       s.wedding.state = 'deferred'
-      s.wedding.next = s.age + rules.family.remarryWait
+      s.wedding.next = p.age + rules.family.remarryWait
       note(s, '伴侣离世，留下的家人仍在原户生活。')
     }
   }
   for (const id of deaths) settle(s, id)
-  if (s.dead) settle(s, 'player')
-  if (s.dead && s.spouse) {
-    const p = s.npcs.find((n) => n.id === s.spouse)!
-    p.partner = null
-    s.spouse = null
-    s.marriage = 'ended'
+  if (p.dead) {
+    settle(s,pid)
+    if (partnerOf(s,pid)) endUnion(s,pid,'ended')
   }
 }
 export function developFamily(s: State) {

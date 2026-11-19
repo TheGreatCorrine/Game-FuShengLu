@@ -39,3 +39,29 @@ export function register(s: Game, template: Kin, parents: string[], external = f
   if (!external) s.residentOrder.push(id)
   return n
 }
+
+export function parentsOf(s: Game, id: string): string[] {
+  if (canonical(s)) return s.parentIds[id]
+  if (id === 'player') return s.playerParentKeys ?? ['father','mother']
+  return s.npcs.find(n => n.id === id)?.parents ?? []
+}
+export function partnerOf(s: Game, id: string) {
+  if (canonical(s)) {
+    const union = s.marriages.find(u => !u.end && u.pair.includes(id))
+    return union?.pair.find(other => other !== id) ?? null
+  }
+  return id === 'player' ? s.spouse : s.npcs.find(n => n.id === id)?.partner ?? null
+}
+export function endUnion(s: Game, id: string, cause: 'ended'|'widowed') {
+  if (canonical(s)) {
+    const union = s.marriages.find(u => !u.end && u.pair.includes(id))
+    if (union) union.end = {year:s.year,cause}
+  } else {
+    const other = partnerOf(s,id)
+    for (const n of s.npcs) if (n.id === id || n.id === other) n.partner = null
+    if (other === 'player' || id === 'player') {
+      s.spouse = null
+      s.marriage = cause
+    }
+  }
+}

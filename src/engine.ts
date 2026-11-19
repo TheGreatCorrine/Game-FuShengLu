@@ -2,7 +2,7 @@ import { generate as birth } from './engine/birth.ts'
 import { legacyPeopleView } from './engine/people.ts'
 import { eligible } from './content/western-han/events.ts'
 export { eligible }
-import { scheduleYear, record } from './engine/scheduler.ts'
+import { beginYear, continueYear, record } from './engine/scheduler.ts'
 import { changeOccupation, confirmedName, payHouseDebt } from './engine/operations.ts'
 import { account, withAccountViews } from './engine/accounts.ts'
 import {
@@ -72,8 +72,8 @@ export function support(s: State, n: Kin) {
 export function advance(input: State, onCandidateDeath?: (person: Kin) => void): State {
   if (!input.name || input.dead || input.pending) return input
   const draft = withAccountViews(structuredClone(input))
-  return scheduleYear(draft, draft, 'player', () => ageResidents(draft, draft.npcs, id => id),
-    () => draft, eligible, onCandidateDeath)
+  beginYear(draft)
+  return continueYear(draft,eligible,onCandidateDeath)
 }
 export function decide(input: State, action: Action): State {
   const event = eligible(input).find((e) => e.id === input.pending)

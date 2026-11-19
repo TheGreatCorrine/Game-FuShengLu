@@ -1,3 +1,4 @@
+import { protagonist, type Life } from './people.ts'
 import type { Estate, State } from './types.ts'
 
 type Projection = 'cash' | 'assets' | 'debt' | 'estates'
@@ -6,7 +7,7 @@ export type LegacySnapshot = Omit<Snapshot, 'households'> & Estate & {
   estates: Record<string, Estate>
 }
 
-export function account(s: Snapshot, id = s.residence): Estate {
+export function account(s: Pick<State,'households'|'residence'> | Life, id = 'residence' in s ? s.residence : protagonist(s).residence): Estate {
   if (!Object.hasOwn(s.households, id)) throw Error('Missing household: ' + id)
   return s.households[id]
 }

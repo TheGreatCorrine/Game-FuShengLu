@@ -1,3 +1,4 @@
+import { player, playerId, keyFor, residents, type Game } from './domain.ts'
 import { account } from './accounts.ts'
 import { authority } from '../content/western-han/authority.ts'
 export { authority }
@@ -30,11 +31,11 @@ export type LegalRuleset = {
   loanSize: number
   term: number
   needsAssent: (sex: string, dependent: boolean, lender: number) => boolean
-  eligible: (s: State, owner: string) => string[]
+  eligible: (s: Game, owner: string) => string[]
   recover: (assets: number, debt: number) => number
   divide: (amount: number, heirs: string[]) => number[]
 }
-export const outstanding = (s: State, id: string) =>
+export const outstanding = (s: Game, id: string) =>
   s.loans.filter((l) => l.debtor === id).reduce((a, l) => a + l.balance, 0)
 export function spendable(s: State) {
   return Math.max(
@@ -100,7 +101,7 @@ export function borrow(
   else s.purse += amount
   return true
 }
-export function repay(s: State, id: string, available: number) {
+export function repay(s: Game, id: string, available: number) {
   if (!Number.isSafeInteger(available) || available < 0)
     throw Error('Invalid payment')
   let left = available
@@ -112,14 +113,15 @@ export function repay(s: State, id: string, available: number) {
   return available - left
 }
 export function settle(
-  s: State,
+  s: Game,
   id: string,
   rule: LegalRuleset = rules.legalRules,
 ) {
   if (s.settlements.some((e) => e.owner === id)) return
-  const n = s.npcs.find((k) => k.id === id)
-  if (id === 'player' ? !s.dead : !n || n.alive) return
-  const assets = n ? n.money : s.purse
+  const p = player(s), pid = playerId(s)
+  const n = residents(s).find((k) => k.id === id)
+  if (id === pid ? !p.dead : !n || n.alive) return
+  const assets = n ? n.money : p.purse
   const liabilities = outstanding(s, id)
   const paid = rule.recover(assets, liabilities)
   const validAmount = (v: number) => Number.isSafeInteger(v) && v >= 0
@@ -128,11 +130,14 @@ export function settle(
 
   // Eligibility belongs to the dynasty. Identity, conservation and ordering
   // are engine contracts and are checked before applying any payment.
-  const ids = rule.eligible(s, id).sort()
-  const heirs = ids.map(heir => heir === 'player' ? s : s.npcs.find(k => k.id === heir))
+  const ids = rule.eligible(s, id).sort((a,b) => {
+    const x = keyFor(s,a), y = keyFor(s,b)
+    return x < y ? -1 : x > y ? 1 : 0
+  })
+  const heirs = ids.map(heir => heir === pid ? p : residents(s).find(k => k.id === heir))
   if (new Set(ids).size !== ids.length || heirs.some(heir => !heir || ('dead' in heir ? heir.dead : !heir.alive)))
     throw Error('Invalid estate recipients: ' + id)
-  const book = ids.length ? null : account(s, n?.house ?? s.residence)
+  const book = ids.length ? null : account(s, n?.house ?? p.residence)
   const gross = rule.divide(assets, ids), charges = rule.divide(paid, ids)
   if (gross.length !== ids.length || charges.length !== ids.length ||
       (ids.length && (gross.reduce((a,b)=>a+b,0) !== assets || charges.reduce((a,b)=>a+b,0) !== paid)))
@@ -148,7 +153,7 @@ export function settle(
     l.balance = 0
   }
   if (n) n.money = 0
-  else s.purse = 0
+  else p.purse = 0
   for (const [i, share] of shares.entries()) {
     const heir = heirs[i]!
     if ('purse' in heir) heir.purse += share.net
@@ -166,9 +171,9 @@ export function settle(
   })
   if (assets || liabilities)
     s.chronicle.push({
-      age: s.age,
+      age: p.age,
       text:
-        (n?.name ?? s.name) +
+        (n?.name ?? p.name) +
         '的私财已清点。先偿契债' +
         paid +
         '钱，余下' +

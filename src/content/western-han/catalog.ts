@@ -1,3 +1,4 @@
+import { player, playerId, parentsOf, residents } from '../../engine/domain.ts'
 import type { LegalRuleset } from '../../engine/legal.ts'
 // Dates use positive BCE labels here. The engine clock uses astronomical years.
 export const regions = ['关中', '河东', '江南'] as const
@@ -47,8 +48,8 @@ const legalRules: LegalRuleset = {
   needsAssent: (sex, dependent, lender) =>
     dependent && lender < (sex === '女' ? 0.4 : 0.22),
   eligible: (s, id) => [
-    ...(!s.dead && (s.playerParentKeys ?? ['father','mother']).includes(id) ? ['player'] : []),
-    ...s.npcs.filter((n) => n.alive && n.parents.includes(id)).map((n) => n.id),
+    ...(!player(s).dead && parentsOf(s, playerId(s)).includes(id) ? [playerId(s)] : []),
+    ...residents(s).filter((n) => n.alive && parentsOf(s,n.id).includes(id)).map((n) => n.id),
   ],
   recover: Math.min,
   divide: (value, ids) =>
