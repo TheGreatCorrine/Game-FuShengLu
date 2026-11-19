@@ -45,11 +45,11 @@ export function beginYear(s: Game) {
   Object.assign(p,annualHealth(p.age,p.health,p.vulnerability,s.env.disease,account(s).debt > 0,
     k => random(s.seed,key+k+s.year),s.mortality))
   finishResidentDeaths(s,ageResidents(s,residents(s),id => keyFor(s,id)))
+  household(s)
 }
 
 export function continueYear(s: State, events: (s: State) => {id:string; weight:number}[],
   onCandidateDeath?: (person: Kin) => void): State {
-  household(s)
   if (!s.dead) developFamily(s)
   if (!s.health) {
     s.dead = true

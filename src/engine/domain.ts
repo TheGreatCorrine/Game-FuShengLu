@@ -65,3 +65,23 @@ export function endUnion(s: Game, id: string, cause: 'ended'|'widowed') {
     }
   }
 }
+
+/** The Western Han slice follows the first birth sibling in persisted roster order. */
+export function birthSibling(s: Game) {
+  if (!canonical(s)) return s.npcs.find(n => n.id === 'sibling')
+  const parents = s.parentIds[s.playerId]
+  return residents(s).find(n => s.parentIds[n.id].some(id => parents.includes(id)))
+}
+export function siblingMate(s: Game, sibling: Person | undefined) {
+  if (!canonical(s)) return s.npcs.find(n => n.id === 'sibPartner')
+  if (!sibling) return undefined
+  const union = s.marriages.find(u => u.pair.includes(sibling.id))
+  const id = union?.pair.find(id => id !== sibling.id)
+  return id ? relative(s,id) : undefined
+}
+
+export function inLawParents(s: Game, house: string) {
+  if (!canonical(s)) return [house+'elder0',house+'elder1']
+  return s.marriages.filter(u => u.pair.includes(s.playerId))
+    .flatMap(u => parentsOf(s,u.pair.find(id => id !== s.playerId)!))
+}

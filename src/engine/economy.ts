@@ -1,3 +1,4 @@
+import { player, residents, type Game } from './domain.ts'
 import { account } from './accounts.ts'
 export { account } from './accounts.ts'
 import { authority } from './legal.ts'
@@ -21,12 +22,13 @@ export function environmentFor(s: Pick<State,'year'|'region'|'seed'>, p: Pick<St
   }
 }
 // Empty households retain unresolved common property under its original owner.
-export function inactiveHouse(s: State, id: string) {
+export function inactiveHouse(s: Game, id: string) {
+  const p = player(s)
   const book = s.households[id]
   if (
     !book ||
-    id === s.residence ||
-    s.npcs.some((n) => n.alive && n.house === id)
+    id === p.residence ||
+    residents(s).some((n) => n.alive && n.house === id)
   )
     return
   s.heads[id] = null
@@ -38,23 +40,24 @@ export function inactiveHouse(s: State, id: string) {
   delete s.households[id]
   delete s.heads[id]
   s.chronicle.push({
-    age: s.age,
+    age: p.age,
     year: s.year,
     text:
       (id === 'birth' ? '旧家' : '亲属之家') +
       '已无人同住，家中财物与欠账已清，遂收起旧账。',
   })
 }
-export function household(s: State) {
-  for (const id of new Set([s.residence, ...Object.keys(s.households)])) {
+export function household(s: Game) {
+  const p = player(s)
+  for (const id of new Set([p.residence, ...Object.keys(s.households)])) {
     const book = account(s, id),
-      active = id === s.residence
-    const residents = s.npcs.filter((n) => n.alive && n.house === id)
-    if (!active && !residents.length) {
+      active = id === p.residence
+    const members = residents(s).filter((n) => n.alive && n.house === id)
+    if (!active && !members.length) {
       inactiveHouse(s, id)
       continue
     }
-    const workers = residents.filter(
+    const workers = members.filter(
       (n) =>
         n.age >= 15 &&
         n.age < 65 &&
@@ -64,12 +67,12 @@ export function household(s: State) {
         n.work !== '未就业',
     )
     s.heads[id] = authority(s, id)
-    const consumption = 6 * (Number(active && !s.dead) + residents.length)
+    const consumption = 6 * (Number(active && !p.dead) + members.length)
     const marketCost = Math.round(consumption * (s.env.price - 1))
     if (active)
-      for (const { message, ...h } of yearImpact(s)) {
+      for (const { message, ...h } of yearImpact({year:s.year,region:s.region,age:p.age,home:p.home})) {
         s.exposure.push({ ...h, cost: h.load ? marketCost : 0 })
-        if (message) s.news.push({ age: s.age, text: message })
+        if (message) s.news.push({ age: p.age, text: message })
       }
     const harvest = s.env.harvest
     const production = workers.reduce(
@@ -85,20 +88,20 @@ export function household(s: State) {
       0,
     )
     const own =
-      Number(active && s.age >= 15 && !s.dead && !s.acute && s.health >= 35) *
-      (yields[s.work] || 0) *
+      Number(active && p.age >= 15 && !p.dead && !p.acute && p.health >= 35) *
+      (yields[p.work] || 0) *
       (s.careYear === s.year ? 0.5 : 1) *
-      (s.work.includes('商') || s.work === '经营货担' ? s.env.trade : 1)
+      (p.work.includes('商') || p.work === '经营货担' ? s.env.trade : 1)
     const income = Math.round(production + own + book.assets * 1.5 * harvest)
     const expenses =
       consumption +
       marketCost +
       Math.ceil(book.assets / 2) +
-      (active && s.acute ? 4 : 0) +
-      residents.filter((n) => n.acute).length * 2 +
-      Number(active && s.training === '习读') * 3
+      (active && p.acute ? 4 : 0) +
+      members.filter((n) => n.acute).length * 2 +
+      Number(active && p.training === '习读') * 3
     const wage = Math.floor(own / 4)
-    s.purse += wage
+    p.purse += wage
     if (active) {
       s.income = income
       s.expenses = expenses

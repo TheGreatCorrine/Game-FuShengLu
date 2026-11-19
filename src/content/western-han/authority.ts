@@ -1,39 +1,25 @@
-import type { Kin, State } from '../../engine/types.ts'
+import { inLawParents, birthSibling, parentsOf, partnerOf, player, playerId, residents, siblingMate, type Game } from '../../engine/domain.ts'
 
-export function authority(s: State, house: string) {
-  const capable = (n: Kin) =>
-    n.alive && n.house === house && n.age >= 15 && n.health >= 35 && !n.acute
-  const adults = s.npcs.filter(capable)
+export function authority(s: Game, house: string) {
+  const p = player(s), pid = playerId(s)
+  const adults = residents(s).filter(n =>
+    n.alive && n.house === house && n.age >= 15 && n.health >= 35 && !n.acute)
+  const capable = (ids: (string|null|undefined)[]) =>
+    ids.find(id => adults.some(n => n.id === id))
+  const elders = inLawParents(s,house)
   if (house.startsWith('kin')) {
-    const head = [s.heads[house], house + 'elder0', house + 'elder1'].find(
-      (id) => adults.some((n) => n.id === id),
-    )
+    const head = capable([s.heads[house], ...elders])
     if (head) return head
   }
   if (house === 'birth') {
-    const parent = ['father', 'mother']
-      .map((id) => adults.find((n) => n.id === id))
-      .find(Boolean)
-    if (parent) return parent.id
+    const head = capable(parentsOf(s,pid))
+    if (head) return head
   }
-  if (
-    house === s.residence &&
-    !s.dead &&
-    s.age >= 16 &&
-    s.health >= 35 &&
-    !s.acute
-  )
-    return 'player'
-  // Named successors by household role, independent of age ranking.
-  const successors =
-    house === 'birth'
-      ? ['sibling', 'sibPartner']
-      : house === 'sibling'
-        ? ['sibling', 'sibPartner']
-        : [house + 'elder0', house + 'elder1', s.spouse]
-  return (
-    successors.find((id) => adults.some((n) => n.id === id)) ??
-    adults.find((n) => n.role === '孩子' || n.role === '手足的孩子')?.id ??
-    null
-  )
+  if (house === p.residence && !p.dead && p.age >= 16 && p.health >= 35 && !p.acute)
+    return pid
+  const sibling = birthSibling(s)
+  const successors = house === 'birth' || house === 'sibling'
+    ? [sibling?.id, siblingMate(s,sibling)?.id]
+    : [...elders,partnerOf(s,pid)]
+  return capable(successors) ?? adults.find(n => n.role === '孩子' || n.role === '手足的孩子')?.id ?? null
 }
