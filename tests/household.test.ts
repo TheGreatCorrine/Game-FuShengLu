@@ -6,7 +6,7 @@ const born = () => confirmName(generate('house-amendment'), '安')
 it('charges dependents and credits only present productive members', () => {
   const s = born()
   s.home = 0
-  s.assets = 0
+  s.households[s.residence].assets = 0
   for (const n of s.npcs) {
     n.work = '耕作'
     n.acute = ''
@@ -20,16 +20,17 @@ it('charges dependents and credits only present productive members', () => {
   household(s)
   expect([s.income, s.expenses, s.purse]).toEqual([16, 24, purse])
   s.npcs[0].house = 'elsewhere'
-  s.estates.elsewhere = { cash: 0, assets: 0, debt: 0 }
+  s.households.elsewhere = { cash: 0, assets: 0, debt: 0 }
   household(s)
   expect([s.income, s.expenses]).toEqual([8, 18])
   expect(s.estates.elsewhere.cash).toBe(2)
 })
 it('keeps a minor in the birth household and chooses a capable named successor', () => {
   const s = born()
+  s.households.independent = { cash: 0, assets: 0, debt: 0 }
   s.residence = 'independent'
   s.age = 22
-  s.estates.birth = { cash: 4, debt: 16, assets: 0 }
+  s.households.birth = { cash: 4, debt: 16, assets: 0 }
   for (const n of s.npcs.slice(0, 2)) {
     n.alive = false
     n.money = 6
@@ -49,8 +50,9 @@ it('keeps a minor in the birth household and chooses a capable named successor',
 })
 it('holds empty-house obligations dormant and closes cleared funds once, retaining kin history', () => {
   const s = born()
+  s.households.independent = { cash: 0, assets: 0, debt: 0 }
   s.residence = 'independent'
-  s.estates.birth = { cash: 2, debt: 9, assets: 1 }
+  s.households.birth = { cash: 2, debt: 9, assets: 1 }
   for (const n of s.npcs) {
     n.alive = false
     n.money = 0
@@ -66,7 +68,7 @@ it('holds empty-house obligations dormant and closes cleared funds once, retaini
   }
   expect(s.estates.birth).toEqual(frozen)
   // Controlled final disposition of residual property, prior to closure.
-  s.estates.birth = { cash: 7, debt: 7, assets: 0 }
+  s.households.birth = { cash: 7, debt: 7, assets: 0 }
   household(s)
   expect(s.closedHouses.birth).toBe(s.year)
   expect(s.estates.birth).toBeUndefined()

@@ -1,3 +1,4 @@
+import { account } from './accounts.ts'
 import type { State, Kin } from './types.ts'
 import { rules } from '../data.ts'
 import { random } from './rng.ts'
@@ -80,7 +81,7 @@ export function credit(s: State, person = 'player') {
   const n = s.npcs.find((k) => k.id === person),
     house = n?.house ?? s.residence,
     age = n?.age ?? s.age
-  const book = house === s.residence ? s : s.estates[house]
+  const book = account(s, house)
   const head = authority(s, house),
     sponsor = s.npcs.find((k) => k.id === head)
   const backing =
@@ -177,7 +178,7 @@ export function settle(
   }
   if (!shares.length) {
     const house = n?.house ?? s.residence
-    ;(house === s.residence ? s : s.estates[house]).cash += assets - paid
+    account(s, house).cash += assets - paid
   }
   s.settlements.push({
     owner: id,

@@ -1,3 +1,4 @@
+import { account, openHouse } from './accounts.ts'
 import { homes } from '../data.ts'
 import type { State, Kin } from './types.ts'
 import { authority, spendable } from './legal.ts'
@@ -41,7 +42,7 @@ export function participant(s: State, id: string) {
         !n.acute &&
         n.age < 60 &&
         n.work !== '织作' &&
-        (n.ambition > 0.5 || (n.goal === '积谷' && s.debt > 0)),
+        (n.ambition > 0.5 || (n.goal === '积谷' && account(s).debt > 0)),
     )
   if (id === 'feast')
     return local.find(n => ['父亲','母亲','姻亲长辈（父）','姻亲长辈（母）'].includes(n.role))
@@ -74,7 +75,7 @@ export function allowed(s: State, id: string, a: Action) {
   if (a === 'split') return spendable(s) >= 4
   if (a === 'medicineFee') return spendable(s) >= 5
   if (a === 'stake') return spendable(s) >= 3
-  if (a === 'halfDays') return !!participant(s, id) && s.cash >= 2
+  if (a === 'halfDays') return !!participant(s, id) && account(s).cash >= 2
   if (a === 'pledge') return !s.promise
   return true
 }
@@ -88,7 +89,7 @@ export function narrative(s: State, id: string, body: string) {
     case 'turn':
       return (
         who +
-        (s.debt ? '把借账压到席下。' : '把空出的木简放在案上。') +
+        (account(s).debt ? '把借账压到席下。' : '把空出的木简放在案上。') +
         '邻里愿意教你识字，家里的活却要另找人接。\n' +
         (n.goal === '授业'
           ? '“我愿你读。先说说，你打算什么时候回来帮忙？”'
@@ -105,7 +106,7 @@ export function narrative(s: State, id: string, body: string) {
         '平日做' +
         n.work +
         '，如今看中了邻里的织活。\n' +
-        (s.debt
+        (account(s).debt
           ? '“再照旧做，欠账可不会自己少。丝线先得买。”'
           : '“第一匹布，我想自己试着织。你替我管几天家里的事？”')
       )
@@ -161,11 +162,11 @@ export function negotiate(s: State, n: Kin, id: string, a: Action, r: number) {
   const yes = r < helpChance(s, n)
   switch (a) {
     case 'halfDays':
-      if (!yes && n.goal === '积谷' && s.debt > 0) {
+      if (!yes && n.goal === '积谷' && account(s).debt > 0) {
         remember(s, n, 'dispute', -0.04)
         return n.name + '指着未完的活：“少了半日也赶不及。这次等一等。”'
       }
-      s.cash -= 2
+      account(s).cash -= 2
       s.skill++
       s.practice++
       s.training = '半日习读'
@@ -177,7 +178,7 @@ export function negotiate(s: State, n: Kin, id: string, a: Action, r: number) {
       const own = Math.min(4, n.money)
       s.purse -= 4
       n.money -= own
-      s.estates.sibling = { cash: 4 + own, debt: 0, assets: 0 }
+      openHouse(s, 'sibling', { cash: 4 + own, debt: 0, assets: 0 })
       n.house = 'sibling'
       s.heads.sibling = n.id
       remember(s, n, 'aid', 0.12)
@@ -245,7 +246,7 @@ export function fulfill(s: State) {
   if (!p || s.year < p.due) return
   s.promise = null
   const n = s.npcs.find((n) => n.id === p.id && n.alive && n.house === 'birth'),
-    book = s.estates.birth
+    book = s.residence === 'birth' ? undefined : s.households.birth
   if (!n || !book || s.dead || !book.debt) return
   const amount = Math.min(6, s.purse, book.debt)
   s.purse -= amount

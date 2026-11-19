@@ -1,3 +1,4 @@
+import { account } from './accounts.ts'
 import { random } from './rng.ts'
 import type { State } from './types.ts'
 export const yields: Record<string, number> = {
@@ -27,15 +28,15 @@ export function livelihood(s: State) {
   if (roll > 0.2 || s.age < 19) return s.work
   if (s.work === '代人理账' && s.home === 3 && s.sex === '男' && s.skill >= 4)
     return '佐理文书'
-  if (s.work === '田间劳作' && s.assets >= 2 && s.practice >= 5) return '管田'
+  if (s.work === '田间劳作' && account(s).assets >= 2 && s.practice >= 5) return '管田'
   if (s.work === '习艺' && s.practice >= 4) return '织作'
   if (
     s.work === '随家行商' &&
-    s.cash >= 18 &&
+    account(s).cash >= 18 &&
     s.practice >= 4 &&
     s.env.trade > 0.8
   )
     return '经营货担'
-  if (s.work === '经营货担' && s.debt > 25) return '随家行商'
+  if (s.work === '经营货担' && account(s).debt > 25) return '随家行商'
   return s.work
 }

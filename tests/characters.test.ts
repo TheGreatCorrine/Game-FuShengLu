@@ -29,6 +29,7 @@ it('requires an actual sick resident and charges the correct person for care', (
 it('retains the existing in-law household head while an adult player resides there', () => {
   const s = born()
   s.age = 30
+  s.households.kin1 = { cash: 0, assets: 0, debt: 0 }
   s.residence = 'kin1'
   const elder = { ...s.npcs[0], id: 'kin1elder0', house: 'kin1' }
   s.npcs.push(elder)
@@ -73,13 +74,14 @@ it('funds a sibling only with real private resources and requires initiative', (
 })
 it('settles an explicit future promise once against the original named household', () => {
   const s = born()
+  s.households.independent = { cash: 0, assets: 0, debt: 0 }
   Object.assign(s, {
     age: 28,
     residence: 'independent',
     purse: 5,
     pending: 'letterHome',
   })
-  s.estates.birth = { cash: 0, assets: 1, debt: 12 }
+  s.households.birth = { cash: 0, assets: 1, debt: 12 }
   const p = decide(s, 'pledge')
   expect(p.purse).toBe(5)
   expect(p.promise?.id).toBe('father')
@@ -105,7 +107,7 @@ it('retains a spouse livelihood after a funded proposal, with a genuine alternat
   })
   s.npcs.push(p)
   s.spouse = p.id
-  s.debt = 10
+  s.households[s.residence].debt = 10
   const next = decide(s, 'stake')
   expect(next.purse).toBe(5)
   expect(next.npcs.at(-1)?.work).toBe('织作')

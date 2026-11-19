@@ -1,3 +1,5 @@
+import { account } from './accounts.ts'
+export { account } from './accounts.ts'
 import { authority } from './legal.ts'
 import type { State } from './types.ts'
 import { random } from './rng.ts'
@@ -35,12 +37,9 @@ export function environment(s: State) {
     harvest,
   }
 }
-export function account(s: State, id: string) {
-  return id === s.residence ? s : s.estates[id]
-}
 // Empty households retain unresolved common property under its original owner.
 export function inactiveHouse(s: State, id: string) {
-  const book = s.estates[id]
+  const book = s.households[id]
   if (
     !book ||
     id === s.residence ||
@@ -53,7 +52,7 @@ export function inactiveHouse(s: State, id: string) {
   book.debt -= paid
   if (book.cash || book.assets || book.debt) return
   s.closedHouses[id] = s.year
-  delete s.estates[id]
+  delete s.households[id]
   delete s.heads[id]
   s.chronicle.push({
     age: s.age,
@@ -64,7 +63,7 @@ export function inactiveHouse(s: State, id: string) {
   })
 }
 export function household(s: State) {
-  for (const id of new Set([s.residence, ...Object.keys(s.estates)])) {
+  for (const id of new Set([s.residence, ...Object.keys(s.households)])) {
     const book = account(s, id),
       active = id === s.residence
     const residents = s.npcs.filter((n) => n.alive && n.house === id)

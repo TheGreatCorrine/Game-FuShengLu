@@ -1,3 +1,4 @@
+import { account, withAccountViews } from './engine/accounts.ts'
 import {
   participant,
   allowed,
@@ -7,6 +8,7 @@ import {
   narrative,
 } from './engine/encounters.ts'
 export { participant, narrative }
+export { migrateHouseholds } from './engine/accounts.ts'
 import {
   authority,
   borrow,
@@ -30,7 +32,7 @@ import {
   remember,
   helpChance,
 } from './engine/family.ts'
-import { household, environment, account } from './engine/economy.ts'
+import { household, environment } from './engine/economy.ts'
 export { yearImpact } from './engine/economy.ts'
 export { random }
 export type { State, Kin }
@@ -42,7 +44,7 @@ export function generate(
   const region = Math.floor(r('region') * regions.length),
     home = weighted(rules.weights[region], r('home')),
     birth = 1 - rules.birthBCE[Math.floor(r('birth') * 4)]
-  const s: State = {
+  const s = withAccountViews({
     loans: [],
     settlements: [],
     nextCollection: 0,
@@ -52,13 +54,12 @@ export function generate(
     acute: '',
     risk: 0,
     practice: 0,
-    assets: home === 1 ? 0 : home === 0 ? 2 : 1,
+    households: { birth: { cash: homes[home].coins + Math.floor(r('cash') * 20), assets: home === 1 ? 0 : home === 0 ? 2 : 1, debt: 0 } },
     residence: 'birth',
     closedHouses: {},
     candidate: null,
     promise: null,
     careYear: null,
-    estates: {},
     heads: { birth: 'father' },
     spouse: null,
     unions: 0,
@@ -77,9 +78,7 @@ export function generate(
     health: 80 + Math.floor(r('health') * 20),
     talent: r('ability'),
     skill: 0,
-    cash: homes[home].coins + Math.floor(r('cash') * 20),
     purse: 0,
-    debt: 0,
     income: 0,
     expenses: 0,
     work: '幼年',
@@ -93,7 +92,7 @@ export function generate(
     training: '',
     queue: [],
     exposure: [],
-  }
+  })
   const sibling = 1 + Math.floor(r('sib') * 7)
   s.npcs = [
     kin(s, '父亲', 25 + sibling + Math.floor(r('father') * 12), 'father'),
@@ -105,7 +104,7 @@ export function generate(
 export function confirmName(s: State, name: string) {
   if (s.name || !name.trim() || Array.from(name.trim()).length > 8)
     throw Error('名须为一至八字，落定后不可更改。')
-  return { ...s, name: name.trim() }
+  return withAccountViews({ ...structuredClone(s), name: name.trim() })
 }
 export const date = (year: number) =>
   year <= 0 ? '前' + (1 - year) + '年' : '公元' + year + '年'
@@ -124,9 +123,9 @@ export function support(s: State, n: Kin) {
         0.1 * n.generosity +
         0.15 * n.trust +
         0.15 * Number(n.goal === '授业') +
-        0.15 * Number(s.cash > 35) +
+        0.15 * Number(account(s).cash > 35) +
         0.09 * homes[s.home].books -
-        0.15 * Number(s.debt > 0) -
+        0.15 * Number(account(s).debt > 0) -
         0.08 * Number(s.sex === '女' && homes[s.home].books === 0),
     ),
   )
@@ -137,31 +136,31 @@ export function eligible(s: State) {
       (e) =>
         (e.id !== 'studyConflict' ||
           (s.training === '习读' &&
-            s.debt > 0 &&
+            account(s).debt > 0 &&
             participant(s, 'turn')?.goal === '积谷' &&
             ['father', 'mother'].includes(participant(s, 'turn')!.id))) &&
         (e.id !== 'medicine' || !!participant(s, 'medicine')) &&
-        (e.id !== 'personalLoan' || s.purse < 16 || s.debt > 0) &&
+        (e.id !== 'personalLoan' || s.purse < 16 || account(s).debt > 0) &&
         (e.id !== 'collect' ||
           (s.age >= s.nextCollection &&
             s.loans.some(
               (l) => l.debtor === 'player' && l.balance > 0 && l.due <= s.year,
             ))) &&
         (e.id !== 'demand' ||
-          (s.residence !== 'birth' && (s.estates.birth?.debt ?? 0) > 0)) &&
+          (s.residence !== 'birth' && (s.households.birth?.debt ?? 0) > 0)) &&
         s.name &&
         !s.dead &&
         s.age >= e.min &&
         s.age <= e.max &&
         (!s.seen.includes(e.id) || e.id === 'wedding' || e.id === 'collect') &&
         (e.id !== 'relief' ||
-          (s.debt >= 8 &&
+          (account(s).debt >= 8 &&
             living(s).some(
               (n) => n.house === s.residence && n.age >= 16 && n.money > 0,
             ))) &&
         (e.id !== 'letterHome' ||
           (s.residence !== 'birth' &&
-            (s.estates.birth?.debt ?? 0) >= 8 &&
+            (s.households.birth?.debt ?? 0) >= 8 &&
             s.purse >= 1 &&
             living(s).some((n) => n.house === 'birth'))) &&
         (e.id !== 'wedding' || s.age >= s.wedding.next) &&
@@ -196,7 +195,7 @@ function mature(s: State) {
       const ok =
         s.health > 40 &&
         random(s.seed, 'completion') <
-          0.45 + 0.3 * s.talent + 0.15 * Number(s.debt === 0)
+          0.45 + 0.3 * s.talent + 0.15 * Number(account(s).debt === 0)
       s.training = ok ? '学成' : '中辍'
       s.skill += ok ? 3 : 0
       record(
@@ -212,7 +211,7 @@ function mature(s: State) {
 }
 export function advance(input: State): State {
   if (!input.name || input.dead || input.pending) return input
-  const s = structuredClone(input)
+  const s = withAccountViews(structuredClone(input))
   s.age++
   s.year++
   environment(s)
@@ -221,7 +220,7 @@ export function advance(input: State): State {
     s.health,
     s.vulnerability,
     s.env.disease,
-    s.debt > 0,
+    account(s).debt > 0,
     (k) => random(s.seed, 'player' + k + s.year),
     s.mortality,
   )
@@ -289,7 +288,7 @@ export function decide(input: State, action: Action): State {
   const event = eligible(input).find((e) => e.id === input.pending)
   const choice = event?.choices.find((c) => c[1] === action)
   if (!event || !choice) throw Error('此项选择当前不可用')
-  const s = structuredClone(input),
+  const s = withAccountViews(structuredClone(input)),
     cause = event.id,
     adult = living(s).find((n) => n.id === authority(s, s.residence)),
     r = random(
@@ -335,9 +334,9 @@ export function decide(input: State, action: Action): State {
               : '你收起荷包。'
       break
     case 'gift': {
-      const amount = Math.min(6, s.purse, s.estates.birth.debt)
+      const amount = Math.min(6, s.purse, s.households.birth.debt)
       s.purse -= amount
-      s.estates.birth.debt -= amount
+      s.households.birth.debt -= amount
       result = '你替旧户还了' + amount + '钱。'
       break
     }
@@ -384,17 +383,17 @@ export function decide(input: State, action: Action): State {
       const n = involved!
       actors = [n.id]
       if (action === 'aid') {
-        const amount = Math.min(12, s.purse, s.estates.birth.debt)
+        const amount = Math.min(12, s.purse, s.households.birth.debt)
         s.purse -= amount
-        s.estates.birth.debt -= amount
+        s.households.birth.debt -= amount
         remember(s, n, 'aid', 0.12)
         result = n.name + ' 收下了送到旧家的钱，用来还债。'
       } else if (action === 'petition') {
         const accepted = r < helpChance(s, n)
         if (accepted) {
-          const amount = Math.min(10, n.money, s.debt)
+          const amount = Math.min(10, n.money, account(s).debt)
           n.money -= amount
-          s.debt -= amount
+          account(s).debt -= amount
         }
         result =
           n.name +
@@ -410,8 +409,8 @@ export function decide(input: State, action: Action): State {
     }
     case 'learn': {
       const ok =
-        (s.cash >= 5 ||
-          (!!adult && s.cash + adult.money >= 5 && adult.generosity > 0.7)) &&
+        (account(s).cash >= 5 ||
+          (!!adult && account(s).cash + adult.money >= 5 && adult.generosity > 0.7)) &&
         r < (adult ? support(s, adult) : 0.15)
       if (adult) {
         remember(s, adult, ok ? 'study' : 'dispute', ok ? 0.06 : -0.09)
@@ -419,14 +418,14 @@ export function decide(input: State, action: Action): State {
         adult.closeness = Math.min(1, adult.closeness + 0.02)
       }
       if (ok) {
-        const fromHouse = Math.min(5, s.cash)
-        s.cash -= fromHouse
+        const fromHouse = Math.min(5, account(s).cash)
+        account(s).cash -= fromHouse
         if (adult) adult.money -= 5 - fromHouse
         s.skill++
         result = '匀出五钱，开始习字。'
       } else
         result =
-          s.cash < 5
+          account(s).cash < 5
             ? '家中连束脩都凑不齐，只好先顾生计。'
             : '家人掂量过眼下的活计，未能应允。'
       if (adult)
@@ -436,7 +435,7 @@ export function decide(input: State, action: Action): State {
             ? adult.goal === '授业'
               ? '把简推到你面前：“去吧，学会了回来教我。”'
               : '点了钱：“工别落下，我替你应这一次。”'
-            : s.cash < 5
+            : account(s).cash < 5
               ? '摊开空钱袋：“你看看，拿什么付呢？”'
               : adult.generosity > 0.55
                 ? '收好简册：“我先替你留着。等家里缓一缓。”'
@@ -494,15 +493,15 @@ export function decide(input: State, action: Action): State {
     case 'marry': {
       const partner = s.candidate!
       const ok =
-        s.cash >= 6 &&
+        account(s).cash >= 6 &&
         r <
           0.45 +
             0.15 * partner.generosity +
             0.09 * Number(partner.history.some((m) => m.id === 'meeting')) +
             0.08 * Number(s.skill >= 3) +
-            0.12 * Number(s.debt === 0)
+            0.12 * Number(account(s).debt === 0)
       if (ok) {
-        s.cash -= 6
+        account(s).cash -= 6
         joinFamily(s, partner)
         s.candidate = null
       }
@@ -534,7 +533,7 @@ export function decide(input: State, action: Action): State {
         : []),
     ],
     changes: {
-      cash: s.cash - input.cash,
+      cash: account(s).cash - account(input).cash,
       skill: s.skill - input.skill,
       purse: s.purse - input.purse,
       practice: s.practice - input.practice,

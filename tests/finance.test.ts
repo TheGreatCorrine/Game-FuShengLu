@@ -16,7 +16,8 @@ it('assigns capable father, mother and independent heads without reassigning lia
   expect(authority(s, 'birth')).toBe('father')
   s.npcs[0].acute = '受伤'
   expect(authority(s, 'birth')).toBe('mother')
-  s.estates.birth = { cash: 0, debt: 45, assets: 1 }
+  s.households.birth = { cash: 0, debt: 45, assets: 1 }
+  s.households.independent = { cash: 0, assets: 0, debt: 0 }
   s.residence = 'independent'
   expect(authority(s, s.residence)).toBe('player')
   expect(outstanding(s, 'player')).toBe(0)
@@ -57,7 +58,7 @@ it('caps insolvency at estate assets and keeps old household debt separate', () 
     n = s.npcs[0]
   n.money = 2
   n.alive = false
-  s.debt = 40
+  s.households[s.residence].debt = 40
   s.loans = [
     {
       id: 'x',
@@ -97,15 +98,14 @@ it('permits both sexes to borrow with resources and restricts discretionary spen
 })
 it('rejects an unsupported demand without charging either wallet; voluntary gift reduces only the specified balance', () => {
   const s = birth()
+  s.households.independent = { cash: 11, assets: 0, debt: 0 }
   Object.assign(s, {
     age: 30,
     residence: 'independent',
-    cash: 11,
-    debt: 0,
     purse: 9,
     pending: 'demand',
   })
-  s.estates.birth = { cash: 0, assets: 1, debt: 22 }
+  s.households.birth = { cash: 0, assets: 1, debt: 22 }
   const refused = decide(s, 'pass'),
     gift = decide(s, 'gift')
   expect([refused.purse, refused.debt, refused.estates.birth.debt]).toEqual([
@@ -118,7 +118,8 @@ it('retains education as an attempted choice; a sponsor can pay the uncovered co
   let found = false
   for (let i = 0; i < 80 && !found; i++) {
     const s = birth(String(i))
-    Object.assign(s, { age: 15, pending: 'turn', cash: 1, debt: 10 })
+    Object.assign(s, { age: 15, pending: 'turn' })
+    Object.assign(s.households.birth, { cash: 1, debt: 10 })
     const father = s.npcs[0]
     father.generosity = 0.9
     father.money = 0

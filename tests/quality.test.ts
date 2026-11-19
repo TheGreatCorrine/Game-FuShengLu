@@ -21,13 +21,14 @@ it('reopens negotiations after cooldown and prevents duplicate partners', () => 
   const s = {
     ...confirmName(generate('match'), '安'),
     age: 21,
-    cash: 0,
     pending: 'wedding',
   }
+  s.households.birth.cash = 0
   const next = decide(s, 'marry')
   expect(next.wedding.state).toBe('deferred')
   expect(eligible(next).some((e) => e.id === 'wedding')).toBe(false)
-  let retry = { ...next, age: 24, cash: 100, pending: 'wedding' }
+  let retry = { ...next, age: 24, pending: 'wedding' }
+  retry.households.birth.cash = 100
   for (let i = 0; i < 20; i++) {
     const result = decide(retry, 'marry')
     if (result.wedding.state === 'resolved') {

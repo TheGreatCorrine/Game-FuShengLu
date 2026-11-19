@@ -3,7 +3,7 @@ import type { State, Kin } from './types.ts'
 import { homes, rules } from '../data.ts'
 import { random } from './rng.ts'
 import { annualHealth } from './mortality.ts'
-import { account } from './economy.ts'
+import { account, openHouse, moveResidence } from './accounts.ts'
 export function kin(s: State, role: string, age: number, id: string): Kin {
   const roll = (k: string) => random(s.seed, id + k)
   return {
@@ -97,11 +97,7 @@ export function helpChance(s: State, n: Kin) {
 export function joinFamily(s: State, p: Kin) {
   const serial = ++s.unions,
     origin = 'kin' + serial
-  s.estates[origin] = {
-    cash: Math.floor(homes[p.background].coins / 2),
-    assets: 1,
-    debt: 0,
-  }
+  const allocation = { cash: Math.floor(homes[p.background].coins / 2), assets: 1, debt: 0 }
   const r = (k: string) => random(s.seed, origin + k)
   for (const [i, chance] of [0.78, 0.46].entries()) {
     if (r('relative' + i) > chance) continue
@@ -122,25 +118,23 @@ export function joinFamily(s: State, p: Kin) {
     s.npcs.push(elder)
   }
   // A later spouse joins the established household, keeping children resident.
-  if (serial === 1 && r('move') < (s.cash < 30 ? 0.75 : 0.48)) {
-    s.estates.birth = { cash: s.cash, assets: s.assets, debt: s.debt }
-    const elders = s.npcs.some((n) => n.house === origin)
-    s.residence = elders ? origin : 'independent'
-    Object.assign(s, s.estates[origin])
-    delete s.estates[origin]
-  }
-  // A spouse with no other represented relatives brings the allocated goods.
-  if (s.estates[origin] && !s.npcs.some((n) => n.house === origin)) {
-    s.cash += s.estates[origin].cash
-    s.assets += s.estates[origin].assets
-    delete s.estates[origin]
+  const elders = s.npcs.some(n => n.house === origin)
+  const moving = serial === 1 && r('move') < (account(s).cash < 30 ? 0.75 : 0.48)
+  if (elders || moving) {
+    const destination = elders ? origin : 'independent'
+    openHouse(s, destination, allocation)
+    if (moving) moveResidence(s, destination)
+  } else {
+    // An unrepresented spouse household contributes its original endowment once.
+    account(s).cash += allocation.cash
+    account(s).assets += allocation.assets
   }
   p.house = s.residence
   p.partner = 'player'
   s.spouse = p.id
   s.npcs.push(p)
   for (const id of [origin, s.residence])
-    if (id === s.residence || s.estates[id]) s.heads[id] = authority(s, id)
+    if (id === s.residence || s.households[id]) s.heads[id] = authority(s, id)
   s.marriage = serial === 1 ? 'married' : 'remarried'
   note(
     s,
@@ -299,12 +293,12 @@ export function developFamily(s: State) {
     mate.partner = sib.id
     sib.partner = mate.id
     if (
-      !s.estates.sibling &&
+      !s.households.sibling &&
       sib.house !== 'sibling' &&
       sib.money >= 9 &&
       sib.ambition > 0.6
     ) {
-      s.estates.sibling = { cash: 6, assets: 0, debt: 0 }
+      openHouse(s, 'sibling', { cash: 6, assets: 0, debt: 0 })
       sib.money -= 6
       sib.house = mate.house = 'sibling'
     }
@@ -347,7 +341,7 @@ export function developFamily(s: State) {
     return
   if (
     random(s.seed, 'child' + s.age) >=
-    rules.family.chance * (s.debt > 0 ? 0.65 : 1)
+    rules.family.chance * (account(s).debt > 0 ? 0.65 : 1)
   )
     return
   const id = 'child' + s.year

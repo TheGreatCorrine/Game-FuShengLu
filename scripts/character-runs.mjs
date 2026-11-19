@@ -70,12 +70,11 @@ for (let i = 0; i < 256; i++) {
 }
 for (let i = 0; i < 100 && !demos.A; i++) {
   const s = born('fathers' + i)
+  Object.assign(s.households[s.residence], { cash: 25, debt: 3 })
   Object.assign(s, {
     age: 15,
     year: s.birth + 15,
     pending: 'turn',
-    cash: 25,
-    debt: 3,
   })
   const a = structuredClone(s),
     b = structuredClone(s)

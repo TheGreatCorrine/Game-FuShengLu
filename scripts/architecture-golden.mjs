@@ -1,11 +1,12 @@
 // Run against the public commands. The fixture records decisions as well as state.
+import { legacyView } from './legacy-household-view.mjs'
 import { advance, confirmName, decide, eligible, generate, random } from '../src/engine.ts'
 import { createHash } from 'node:crypto'
 for (const [seed, policy] of [['quality7','first'], ['quality3','education'], ['quality31','conservative'], ['quality24','random']]) {
   let state = confirmName(generate(seed), '宁')
   const steps = [], hash = createHash('sha256')
   function checkpoint() {
-    hash.update(JSON.stringify(state) + '\n')
+    hash.update(JSON.stringify(legacyView(state)) + '\n')
   }
   checkpoint()
   while (!state.dead) {

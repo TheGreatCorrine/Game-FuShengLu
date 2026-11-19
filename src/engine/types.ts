@@ -53,9 +53,10 @@ export type State = {
   acute: string
   risk: number
   practice: number
-  assets: number
+  readonly assets: number
+  households: Record<string, Estate>
   residence: string
-  estates: Record<string, Estate>
+  readonly estates: Readonly<Record<string, Readonly<Estate>>>
   heads: Record<string, string | null>
   spouse: string | null
   unions: number
@@ -83,9 +84,9 @@ export type State = {
   health: number
   talent: number
   skill: number
-  cash: number
+  readonly cash: number
   purse: number
-  debt: number
+  readonly debt: number
   income: number
   expenses: number
   work: string

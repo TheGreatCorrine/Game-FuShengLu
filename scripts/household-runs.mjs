@@ -78,11 +78,10 @@ if (!examples.B) {
   // Controlled event boundary: cash already earmarked for a wedding while an old debt remains.
   for (let i = 0; i < 100; i++) {
     const s = confirmName(generate('separate' + i), '安')
+    Object.assign(s.households[s.residence], { cash: 200, debt: 500 })
     Object.assign(s, {
       age: 25,
       year: s.birth + 25,
-      cash: 200,
-      debt: 500,
       pending: 'wedding',
     })
     const moved = decide(s, 'marry')
@@ -104,8 +103,9 @@ if (!examples.B) {
 }
 if (!examples.D) {
   const s = confirmName(generate('cleared-house'), '安')
+  s.households.independent = { cash: 0, assets: 0, debt: 0 }
   s.residence = 'independent'
-  s.estates.birth = { cash: 7, debt: 7, assets: 0 }
+  s.households.birth = { cash: 7, debt: 7, assets: 0 }
   for (const n of s.npcs) {
     n.alive = false
     n.health = 0
