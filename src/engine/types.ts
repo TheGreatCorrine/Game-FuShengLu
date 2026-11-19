@@ -45,6 +45,8 @@ type Entry = {
   decision?: string
 }
 export type State = {
+  // Supplied only by the person-graph compatibility adapter.
+  playerParentKeys?: string[]
   loans: import('./legal.ts').Loan[]
   settlements: import('./legal.ts').Settlement[]
   nextCollection: number

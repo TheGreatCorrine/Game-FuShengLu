@@ -47,7 +47,7 @@ const legalRules: LegalRuleset = {
   needsAssent: (sex, dependent, lender) =>
     dependent && lender < (sex === '女' ? 0.4 : 0.22),
   eligible: (s, id) => [
-    ...(!s.dead && (id === 'father' || id === 'mother') ? ['player'] : []),
+    ...(!s.dead && (s.playerParentKeys ?? ['father','mother']).includes(id) ? ['player'] : []),
     ...s.npcs.filter((n) => n.alive && n.parents.includes(id)).map((n) => n.id),
   ],
   recover: Math.min,

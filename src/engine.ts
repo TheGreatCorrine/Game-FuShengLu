@@ -209,7 +209,7 @@ function mature(s: State) {
   }
   s.queue = s.queue.filter((q) => q.age > s.age)
 }
-export function advance(input: State): State {
+export function advance(input: State, onCandidateDeath?: (person: Kin) => void): State {
   if (!input.name || input.dead || input.pending) return input
   const s = withAccountViews(structuredClone(input))
   s.age++
@@ -253,6 +253,7 @@ export function advance(input: State): State {
     )
     n.health = h.health
     if (h.dead) {
+      onCandidateDeath?.({ ...n, alive: false, acute: h.acute })
       s.candidate = null
       s.wedding.attempts++
       record(s, n.name + '的故讯传来，先前的婚议就此作罢。')

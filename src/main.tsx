@@ -1,25 +1,22 @@
+import * as life from './engine/life.ts'
 import { outstanding } from './engine/legal.ts'
 import React, { useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
-  advance,
-  confirmName,
   date,
-  decide,
   eligible,
   narrative,
   participant,
-  generate,
-  skip,
 } from './engine.ts'
 import { history, homes, regions, rules, scenes } from './data.ts'
 import './style.css'
 const fresh = () =>
-  generate(String(crypto.getRandomValues(new Uint32Array(1))[0]))
+  life.generate(String(crypto.getRandomValues(new Uint32Array(1))[0]))
 function App() {
-  const [s, set] = useState(fresh),
+  const [state, set] = useState(fresh),
     [name, rename] = useState(''),
     [seed, setSeed] = useState('')
+  const s = life.legacyPeopleView(state)
   const home = homes[s.home],
     scene = eligible(s).find((e) => e.id === s.pending)
   function restart() {
@@ -56,7 +53,7 @@ function App() {
           <form
             onSubmit={(e) => {
               e.preventDefault()
-              if (name.trim()) set(confirmName(s, name))
+              if (name.trim()) set(life.confirmName(state, name))
             }}
           >
             <label>
@@ -102,15 +99,15 @@ function App() {
                     <p key={i}>{line}</p>
                   ))}
                 {scene.choices.map(([label, a]) => (
-                  <button key={a} onClick={() => set(decide(s, a))}>
+                  <button key={a} onClick={() => set(life.decide(state, a))}>
                     {label}
                   </button>
                 ))}
               </article>
             ) : !s.dead ? (
               <>
-                <button onClick={() => set(advance(s))}>过一年</button>
-                <button onClick={() => set(skip(s))}>行至下一次抉择</button>
+                <button onClick={() => set(life.advance(state))}>过一年</button>
+                <button onClick={() => set(life.skip(state))}>行至下一次抉择</button>
               </>
             ) : (
               <h3>此生终章 · 享年 {s.age}</h3>
@@ -206,7 +203,7 @@ function App() {
           />
           <button
             onClick={() => {
-              set(generate(seed))
+              set(life.generate(seed))
               rename('')
             }}
           >
