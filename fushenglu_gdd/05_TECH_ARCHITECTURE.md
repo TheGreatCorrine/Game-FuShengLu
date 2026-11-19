@@ -174,3 +174,23 @@ interface HouseholdSystem {
 - 命名采用 `birthSurname` + `givenName`；`confirmBirthName()` 仅出生阶段调用一次，确认后 immutable；称谓单独存储。
 - 可选 `knowledgeFlags: Record<string, boolean>` 仅供少数事件守卫条件使用，MVP 不依赖。
 - 静态事件资料在编译/打包时进入游戏资源；基础模式不调用 LLM。参考 `11_REGIONAL_THEMES_AND_NO_AI_NARRATIVE.md`。
+
+## v1.3 建议接口扩展（需先审计现有实现）
+
+下列为设计契约而非必须新增的类或统一的重构命令：
+
+```ts
+interface AnnualActionBudget {
+  year: number;
+  available: number;       // 成年常规为 2；童年/特殊情况由规则决定
+  usedActionKeys: string[];
+  marketVisited: boolean; // 市集该年最多访问一次
+}
+
+type ObservedRelationship =
+  | '亲近' | '尚可' | '疏远' | '彼此不睦' | '尚不清楚';
+```
+
+- 优先复用现有 NPC 关系、人格、技能、健康与历史规则；对用户显示的模糊评价来自可观察行为与角色认知，不是直接把隐藏分数分段泄露。
+- 预留一次市集访问包含多件商品的购物事务；本阶段先写设计，不建完整道具系统和商城 UI。
+- 不引入后台、账号、服务器存档或在线生成 AI。对旧测试 seed 的差异需提供迁移说明与原因分析。
