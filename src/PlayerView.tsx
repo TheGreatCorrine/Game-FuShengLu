@@ -64,7 +64,7 @@ export function PlayerView({observation:s, confirm, choose, advance, skip, resta
             </p>
             <p>
               身体
-              {s.condition}　｜　{s.resources}
+              {s.condition}｜　{s.resources}
             </p>
             <details><summary>查看家计</summary><p>荷包 {s.purse} 钱　｜　家中 {s.cash} 钱　｜　家户欠债{' '}
               {s.debt} 钱　｜　个人契债 {s.personalDebt} 钱</p></details>
@@ -131,7 +131,7 @@ export function PlayerView({observation:s, confirm, choose, advance, skip, resta
           <details>
             <summary>亲属 · {s.relatives.length}</summary>
             <p>
-              {s.residence}　·　{s.marriage}
+              {s.residence}·{s.marriage}
             </p>
             {s.relatives.map((n) => (
               <p key={n.id}>
