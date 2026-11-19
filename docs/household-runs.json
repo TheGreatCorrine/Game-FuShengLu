@@ -1,0 +1,57 @@
+{
+  "C": {
+    "seed": "debt2",
+    "age": 36,
+    "parent": "father",
+    "heirs": [
+      {
+        "id": "player",
+        "gross": 3,
+        "charge": 0,
+        "net": 3
+      },
+      {
+        "id": "sibling",
+        "gross": 3,
+        "charge": 0,
+        "net": 3
+      }
+    ],
+    "dependent": "niece",
+    "ageOfDependent": 14,
+    "head": "mother",
+    "householdDebt": 56
+  },
+  "A": {
+    "seed": "debt3",
+    "age": 15,
+    "debt": 71,
+    "cash": 0,
+    "choice": "learn",
+    "result": "请求随师识字。家中连束脩都凑不齐，只好先顾生计。"
+  },
+  "B": {
+    "fixture": true,
+    "seed": "separate0",
+    "action": "marry",
+    "oldCash": 194,
+    "oldDebt": 500,
+    "newCash": 39,
+    "newDebt": 0,
+    "privateBefore": 0,
+    "privateAfter": 0
+  },
+  "D": {
+    "fixture": true,
+    "seed": "cleared-house",
+    "closeYear": -139,
+    "stillClosed": true,
+    "bookRemoved": true,
+    "kin": [
+      "father",
+      "mother",
+      "sibling"
+    ],
+    "estatesSettled": 3
+  }
+}

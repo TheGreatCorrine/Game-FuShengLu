@@ -1,0 +1,52 @@
+{
+  "seed": "memory12",
+  "fixture": true,
+  "outcomes": [
+    {
+      "action": "bond",
+      "age": 25,
+      "debt": 0,
+      "response": "开口相求。郑和 取出私蓄，先还了一部分欠账。",
+      "memories": [
+        {
+          "id": "care",
+          "year": -119,
+          "actors": [
+            "player",
+            "father"
+          ],
+          "trust": 0.12,
+          "significance": 0.12
+        },
+        {
+          "id": "petition",
+          "year": -114,
+          "actors": [
+            "player",
+            "father"
+          ],
+          "trust": 0.04,
+          "significance": 0.04
+        }
+      ]
+    },
+    {
+      "action": "work",
+      "age": 25,
+      "debt": 10,
+      "response": "开口相求。郑和 摇摇头，把钱留作以后的口粮。",
+      "memories": [
+        {
+          "id": "petition",
+          "year": -114,
+          "actors": [
+            "player",
+            "father"
+          ],
+          "trust": -0.03,
+          "significance": 0.03
+        }
+      ]
+    }
+  ]
+}

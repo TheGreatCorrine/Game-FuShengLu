@@ -1,0 +1,126 @@
+{
+  "n": 1000,
+  "meanDeath": 87.261,
+  "deathQuantiles": [
+    83,
+    84,
+    87,
+    90,
+    92
+  ],
+  "ages": {
+    "5": {
+      "alive": 1000,
+      "jobs": {
+        "幼年": 1000
+      },
+      "indebted": 0,
+      "cashQuartiles": [
+        30,
+        72,
+        104
+      ]
+    },
+    "15": {
+      "alive": 1000,
+      "jobs": {
+        "帮工": 1000
+      },
+      "indebted": 24,
+      "cashQuartiles": [
+        26,
+        96,
+        159
+      ]
+    },
+    "25": {
+      "alive": 1000,
+      "jobs": {
+        "帮工": 1000
+      },
+      "indebted": 0,
+      "cashQuartiles": [
+        62,
+        159,
+        250
+      ]
+    },
+    "40": {
+      "alive": 1000,
+      "jobs": {
+        "帮工": 931,
+        "代人理账": 69
+      },
+      "indebted": 0,
+      "cashQuartiles": [
+        101,
+        236,
+        371
+      ]
+    },
+    "60": {
+      "alive": 1000,
+      "jobs": {
+        "帮工": 931,
+        "代人理账": 69
+      },
+      "indebted": 0,
+      "cashQuartiles": [
+        173,
+        363,
+        556
+      ]
+    }
+  },
+  "weddings": 307,
+  "transitions": 0,
+  "changed": 3000,
+  "kinAlive": 273,
+  "delayed": 1971,
+  "events": {
+    "grain": 779,
+    "market": 675,
+    "turn": 1000,
+    "loom": 728,
+    "roof": 981,
+    "store": 964,
+    "medicine": 990,
+    "wedding": 883,
+    "tool": 988,
+    "feast": 994,
+    "measure": 997,
+    "winter": 998,
+    "visit": 993,
+    "letters": 437,
+    "ledger": 177,
+    "offer": 162,
+    "teach": 195,
+    "cart": 139
+  },
+  "hist": {
+    "2 qilian": {
+      "encountered": 326,
+      "local": 0
+    },
+    "2 mobei": {
+      "encountered": 326,
+      "local": 0
+    },
+    "1 qilian": {
+      "encountered": 337,
+      "local": 337
+    },
+    "1 mobei": {
+      "encountered": 337,
+      "local": 337
+    },
+    "0 qilian": {
+      "encountered": 337,
+      "local": 337
+    },
+    "0 mobei": {
+      "encountered": 337,
+      "local": 337
+    }
+  }
+}

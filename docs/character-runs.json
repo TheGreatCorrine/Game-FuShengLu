@@ -1,0 +1,139 @@
+{
+  "policy": "meet first candidate, otherwise first eligible option; C also forks on objection",
+  "totals": {
+    "lives": 256,
+    "quietYears": 11912,
+    "decisions": 3215
+  },
+  "counts": {
+    "grain": 188,
+    "letters": 121,
+    "market": 144,
+    "turn": 244,
+    "studyConflict": 3,
+    "personalLoan": 211,
+    "equip": 219,
+    "medicine": 74,
+    "collect": 152,
+    "wedding": 228,
+    "store": 182,
+    "measure": 196,
+    "feast": 137,
+    "winter": 196,
+    "relief": 174,
+    "tool": 197,
+    "visit": 94,
+    "roof": 166,
+    "loom": 63,
+    "siblingPlan": 90,
+    "offer": 33,
+    "teach": 37,
+    "cart": 14,
+    "spousePlan": 11,
+    "ledger": 36,
+    "demand": 3,
+    "letterHome": 2
+  },
+  "demos": {
+    "B": {
+      "seed": "character2",
+      "first": {
+        "id": "spouse1-0",
+        "name": "朱宁",
+        "age": 26,
+        "work": "文书",
+        "goal": "授业"
+      },
+      "again": {
+        "age": 29,
+        "name": "朱宁",
+        "remembered": true
+      },
+      "action": "marry"
+    },
+    "C": {
+      "seed": "character29",
+      "age": 30,
+      "initiator": "周成",
+      "goal": "积谷",
+      "before": "耕作",
+      "proposal": "伴侣 周成平日做耕作，如今看中了邻里的织活。\n“第一匹布，我想自己试着织。你替我管几天家里的事？”",
+      "action": "stake",
+      "response": "出三钱买线。周成用你出的三钱置线，接下第一匹布。",
+      "ifObject": "说明顾虑，请对方再想想。周成听完仍接了织活：“这一次，我想自己拿主意。”"
+    },
+    "A": {
+      "fixture": true,
+      "seed": "fathers0",
+      "age": 15,
+      "cash": 25,
+      "debt": 3,
+      "choices": [
+        "learn",
+        "learn"
+      ],
+      "results": [
+        [
+          "习读",
+          "请求随师识字。张安把简推到你面前：“去吧，学会了回来教我。”"
+        ],
+        [
+          "未入学",
+          "请求随师识字。张安摇头：“明早缺人。这回先跟我去。”"
+        ]
+      ]
+    },
+    "D": {
+      "seed": "memory12",
+      "fixture": true,
+      "outcomes": [
+        {
+          "action": "bond",
+          "age": 25,
+          "debt": 0,
+          "response": "开口相求。郑和 取出私蓄，先还了一部分欠账。",
+          "memories": [
+            {
+              "id": "care",
+              "year": -119,
+              "actors": [
+                "player",
+                "father"
+              ],
+              "trust": 0.12,
+              "significance": 0.12
+            },
+            {
+              "id": "petition",
+              "year": -114,
+              "actors": [
+                "player",
+                "father"
+              ],
+              "trust": 0.04,
+              "significance": 0.04
+            }
+          ]
+        },
+        {
+          "action": "work",
+          "age": 25,
+          "debt": 10,
+          "response": "开口相求。郑和 摇摇头，把钱留作以后的口粮。",
+          "memories": [
+            {
+              "id": "petition",
+              "year": -114,
+              "actors": [
+                "player",
+                "father"
+              ],
+              "trust": -0.03,
+              "significance": 0.03
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

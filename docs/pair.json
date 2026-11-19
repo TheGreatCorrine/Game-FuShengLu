@@ -1,0 +1,75 @@
+[
+  {
+    "seed": "pair6",
+    "age": 40,
+    "alive": true,
+    "training": "学成",
+    "skill": 4,
+    "work": "代人理账",
+    "cash": 311,
+    "purse": 80,
+    "debt": 0,
+    "ledger": [
+      {
+        "age": 15,
+        "year": -122,
+        "text": "请求随师识字。匀出五钱，开始习字。",
+        "cause": "turn",
+        "decision": "turn:15:learn",
+        "actors": [
+          "player",
+          "father"
+        ],
+        "changes": {
+          "cash": -5,
+          "skill": 1,
+          "purse": 0,
+          "practice": 0
+        },
+        "fact": "习读"
+      },
+      {
+        "age": 18,
+        "year": -119,
+        "text": "三年习读，如今能独自理清一册货账。",
+        "cause": "turn"
+      },
+      {
+        "age": 32,
+        "year": -105,
+        "text": "当年习字取得了接账的资格。",
+        "cause": "turn"
+      }
+    ]
+  },
+  {
+    "seed": "pair6",
+    "age": 40,
+    "alive": true,
+    "training": "留家",
+    "skill": 0,
+    "work": "经营货担",
+    "cash": 93,
+    "purse": 77,
+    "debt": 0,
+    "ledger": [
+      {
+        "age": 15,
+        "year": -122,
+        "text": "留下分担生计。做完了活，荷包添了三钱。",
+        "cause": "turn",
+        "decision": "turn:15:work",
+        "actors": [
+          "player"
+        ],
+        "changes": {
+          "cash": 0,
+          "skill": 0,
+          "purse": 3,
+          "practice": 2
+        },
+        "fact": "留家"
+      }
+    ]
+  }
+]

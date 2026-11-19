@@ -1,0 +1,155 @@
+{
+  "policy": "first eligible option; annual steps",
+  "stats": {
+    "lives": 512,
+    "age5": 503,
+    "married": 199,
+    "widowed": 104,
+    "remarried": 5,
+    "severalChildren": 90,
+    "letters": 24,
+    "maxKin": 11
+  },
+  "A": [
+    {
+      "seed": "family0",
+      "age": 45,
+      "action": "advance",
+      "role": "伴侣",
+      "person": "朱平",
+      "goal": "积谷",
+      "ambition": 0.03244863566942513,
+      "from": "耕作",
+      "to": "织作",
+      "notes": [
+        "朱平 接了织作，想替家里还债。"
+      ]
+    },
+    {
+      "seed": "family1",
+      "age": 2,
+      "action": "advance",
+      "role": "母亲",
+      "person": "朱成",
+      "goal": "授业",
+      "ambition": 0.868110781069845,
+      "from": "耕作",
+      "to": "织作",
+      "notes": [
+        "朱成 接了织作，想替家里还债。"
+      ]
+    },
+    {
+      "seed": "family1",
+      "age": 3,
+      "action": "advance",
+      "role": "父亲",
+      "person": "郑宁",
+      "goal": "授业",
+      "ambition": 0.5081281741149724,
+      "from": "耕作",
+      "to": "织作",
+      "notes": [
+        "郑宁 接了织作，想替家里还债。"
+      ]
+    }
+  ],
+  "B": {
+    "seed": "family12",
+    "age": 26,
+    "action": "marry",
+    "spouse": "spouse1",
+    "residence": "kin1",
+    "kin": [
+      [
+        "kin1elder0",
+        "姻亲长辈（父）"
+      ],
+      [
+        "kin1elder1",
+        "姻亲长辈（母）"
+      ],
+      [
+        "spouse1",
+        "伴侣"
+      ]
+    ],
+    "notes": [
+      "与许和成家，同姻亲合住。",
+      "请媒人回话。两家议定，自此同居过活。"
+    ]
+  },
+  "C": {
+    "seed": "family15",
+    "age": 30,
+    "action": "advance",
+    "oldDebt": 0,
+    "newDebt": 3,
+    "homeMembers": [
+      "陈平",
+      "许和"
+    ]
+  },
+  "E": {
+    "seed": "family15",
+    "age": 37,
+    "action": "aid",
+    "earlier": [
+      {
+        "age": 10,
+        "year": -130,
+        "text": "陈平 接了织作，想替家里还债。"
+      },
+      {
+        "age": 30,
+        "year": -110,
+        "text": "朱和 接了织作，想替家里还债。"
+      }
+    ],
+    "debt": [
+      11,
+      0
+    ],
+    "purse": [
+      36,
+      25
+    ],
+    "response": [
+      "送去手头余钱。陈平 收下了送到旧家的钱，用来还债。"
+    ]
+  },
+  "F": {
+    "seed": "family47",
+    "age": 44,
+    "action": "marry",
+    "first": [
+      [
+        "spouse1",
+        false,
+        null
+      ],
+      [
+        "spouse2",
+        true,
+        "player"
+      ]
+    ],
+    "history": [
+      {
+        "age": 21,
+        "year": -116,
+        "text": "与许成成家，留在原家同住。"
+      },
+      {
+        "age": 22,
+        "year": -115,
+        "text": "伴侣离世，留下的家人仍在原户生活。"
+      },
+      {
+        "age": 44,
+        "year": -93,
+        "text": "与朱成成家，留在原家同住。"
+      }
+    ]
+  }
+}

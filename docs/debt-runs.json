@@ -1,0 +1,73 @@
+{
+  "policy": "First listed option, debt0 through debt511. C and D are controlled fixtures.",
+  "totals": {
+    "lives": 512,
+    "age5": 505,
+    "personalBorrowers": 336,
+    "creditorVisits": 328,
+    "unsupportedClaims": 28,
+    "insolventEstates": 30
+  },
+  "examples": {
+    "B": {
+      "seed": "debt1",
+      "age": 26,
+      "birthDebt": 6,
+      "newHouseDebt": 0,
+      "purseBefore": 19,
+      "purseAfter": 19,
+      "response": "请他找原户核账。你指给他看旧户的名字，他收起了账。"
+    },
+    "A": {
+      "seed": "debt3",
+      "age": 15,
+      "householdDebt": 71,
+      "cash": 0,
+      "response": "请求随师识字。家中连束脩都凑不齐，只好先顾生计。"
+    },
+    "C": {
+      "fixture": true,
+      "settlement": {
+        "owner": "father",
+        "rule": "western-han-wudi-provisional-v1",
+        "assets": 600,
+        "liabilities": 300,
+        "paid": 300,
+        "writtenOff": 0,
+        "shares": [
+          {
+            "id": "player",
+            "gross": 200,
+            "charge": 100,
+            "net": 100
+          },
+          {
+            "id": "sibling",
+            "gross": 200,
+            "charge": 100,
+            "net": 100
+          },
+          {
+            "id": "thirdChild",
+            "gross": 200,
+            "charge": 100,
+            "net": 100
+          }
+        ]
+      }
+    },
+    "D": {
+      "fixture": true,
+      "seed": "credit-parent1",
+      "debtBefore": 10,
+      "after": [
+        0,
+        10
+      ],
+      "responses": [
+        "开口相求。张和 取出私蓄，先还了一部分欠账。",
+        "开口相求。张和 摇摇头，把钱留作以后的口粮。"
+      ]
+    }
+  }
+}

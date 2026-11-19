@@ -1,0 +1,146 @@
+{
+  "n": 1000,
+  "meanDeath": 63.732,
+  "deathQuantiles": [
+    1,
+    38,
+    68,
+    81,
+    96
+  ],
+  "ages": {
+    "5": {
+      "alive": 987,
+      "jobs": {
+        "幼年": 987
+      },
+      "indebted": 286,
+      "cashQuartiles": [
+        0,
+        37,
+        64
+      ]
+    },
+    "15": {
+      "alive": 972,
+      "jobs": {
+        "习艺": 359,
+        "田间劳作": 437,
+        "随家行商": 176
+      },
+      "indebted": 405,
+      "cashQuartiles": [
+        0,
+        11,
+        63
+      ]
+    },
+    "25": {
+      "alive": 937,
+      "jobs": {
+        "田间劳作": 264,
+        "织作": 260,
+        "管田": 133,
+        "经营货担": 128,
+        "习艺": 64,
+        "随家行商": 45,
+        "家中休养": 43
+      },
+      "indebted": 229,
+      "cashQuartiles": [
+        2,
+        68,
+        88
+      ]
+    },
+    "40": {
+      "alive": 890,
+      "jobs": {
+        "田间劳作": 206,
+        "织作": 283,
+        "管田": 179,
+        "代人理账": 36,
+        "经营货担": 135,
+        "家中休养": 40,
+        "随家行商": 6,
+        "佐理文书": 3,
+        "习艺": 2
+      },
+      "indebted": 134,
+      "cashQuartiles": [
+        29,
+        83,
+        186
+      ]
+    },
+    "60": {
+      "alive": 705,
+      "jobs": {
+        "田间劳作": 138,
+        "织作": 239,
+        "管田": 165,
+        "代人理账": 28,
+        "经营货担": 109,
+        "家中休养": 23,
+        "佐理文书": 3
+      },
+      "indebted": 74,
+      "cashQuartiles": [
+        67,
+        185,
+        375
+      ]
+    }
+  },
+  "weddings": 309,
+  "transitions": 181,
+  "changed": 2341,
+  "kinAlive": 950,
+  "delayed": 205,
+  "events": {
+    "letters": 431,
+    "market": 661,
+    "grain": 764,
+    "turn": 972,
+    "roof": 881,
+    "wedding": 1346,
+    "tool": 878,
+    "store": 874,
+    "feast": 823,
+    "measure": 874,
+    "winter": 862,
+    "medicine": 860,
+    "visit": 663,
+    "loom": 705,
+    "ledger": 95,
+    "offer": 88,
+    "teach": 100,
+    "cart": 123
+  },
+  "hist": {
+    "1 qilian": {
+      "encountered": 321,
+      "local": 321
+    },
+    "1 mobei": {
+      "encountered": 317,
+      "local": 317
+    },
+    "0 qilian": {
+      "encountered": 325,
+      "local": 325
+    },
+    "0 mobei": {
+      "encountered": 323,
+      "local": 323
+    },
+    "2 qilian": {
+      "encountered": 314,
+      "local": 0
+    },
+    "2 mobei": {
+      "encountered": 313,
+      "local": 0
+    }
+  }
+}
