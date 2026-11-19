@@ -1,3 +1,4 @@
+import { player, playerId, residents, type Game } from './domain.ts'
 import { payHouseDebt, changeOccupation } from './operations.ts'
 import { account, openHouse } from './accounts.ts'
 import type { State, Kin } from './types.ts'
@@ -87,20 +88,20 @@ export function negotiate(s: State, n: Kin, id: string, a: Action, r: number) {
       throw Error('Unsupported negotiation ' + id)
   }
 }
-export function fulfill(s: State) {
+export function fulfill(s: Game) {
   const p = s.promise
   if (!p || s.year < p.due) return
   s.promise = null
-  const n = s.npcs.find((n) => n.id === p.id && n.alive && n.house === 'birth'),
-    book = s.residence === 'birth' ? undefined : s.households.birth
-  if (!n || !book || s.dead || !book.debt) return
-  const amount = payHouseDebt(s, book, 6)
+  const n = residents(s).find((n) => n.id === p.id && n.alive && n.house === 'birth'),
+    book = player(s).residence === 'birth' ? undefined : s.households.birth
+  if (!n || !book || player(s).dead || !book.debt) return
+  const amount = payHouseDebt(player(s), book, 6)
   remember(s, n, amount ? 'aid' : 'brokenPromise', amount ? 0.12 : -0.09)
   const entry = {
-    age: s.age,
+    age: player(s).age,
     year: s.year,
     cause: 'letterHome',
-    actors: ['player', n.id],
+    actors: [playerId(s), n.id],
     text: amount
       ? '照去年的约定，你给' + n.name + '捎回' + amount + '钱抵旧账。'
       : '这一年仍无余钱，你只得写信给' + n.name + '说明失约。',

@@ -72,8 +72,8 @@ export function support(s: State, n: Kin) {
 export function advance(input: State, onCandidateDeath?: (person: Kin) => void): State {
   if (!input.name || input.dead || input.pending) return input
   const draft = withAccountViews(structuredClone(input))
-  beginYear(draft)
-  return continueYear(draft,eligible,onCandidateDeath)
+  beginYear(draft,onCandidateDeath)
+  return continueYear(draft,eligible)
 }
 export function decide(input: State, action: Action): State {
   const event = eligible(input).find((e) => e.id === input.pending)

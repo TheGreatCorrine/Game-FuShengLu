@@ -1,4 +1,4 @@
-import { birthSibling, siblingMate, parentsOf, keyFor, register, formUnion, kinContext, player, playerId, residents, partnerOf, endUnion, type Game } from './domain.ts'
+import { canonical, attitude, unionCount, currentCandidate, type Person, birthSibling, siblingMate, parentsOf, keyFor, register, formUnion, kinContext, player, playerId, residents, partnerOf, endUnion, type Game } from './domain.ts'
 import { payHouseDebt, changeOccupation, transferSavings } from './operations.ts'
 import { authority, settle, borrow, outstanding, repay } from './legal.ts'
 import type { State, Kin } from './types.ts'
@@ -54,29 +54,31 @@ export function kin(s: Pick<State,'seed'|'sex'|'year'|'residence'|'home'|'surnam
 const note = (s: Game, text: string) =>
   s.chronicle.push({ age: player(s).age, year: s.year, text })
 const clamp = (v: number) => Math.min(1, Math.max(0, v))
-export function remember(s: State, n: Kin, id: string, trust: number) {
-  if (!n.alive || (!s.npcs.includes(n) && s.candidate !== n) || !id || !Number.isFinite(trust))
+export function remember(s: Game, n: Person, id: string, trust: number) {
+  if (!n.alive || (!residents(s).includes(n) && currentCandidate(s) !== n) || !id || !Number.isFinite(trust))
     throw Error('Invalid relationship update: ' + n.id)
-  n.trust = clamp(n.trust + trust)
-  n.conflict = clamp(n.conflict - trust)
-  n.history.push({
+  const feelings = attitude(s,n)
+  feelings.trust = clamp(feelings.trust + trust)
+  feelings.conflict = clamp(feelings.conflict - trust)
+  feelings.history.push({
     id,
     year: s.year,
-    actors: ['player', n.id],
+    actors: [playerId(s), n.id],
     trust,
     significance: Math.abs(trust),
   })
-  if (n.history.length > 8)
-    n.history.splice(
-      n.history.findIndex(
+  if (feelings.history.length > 8)
+    feelings.history.splice(
+      feelings.history.findIndex(
         (m) =>
-          m.significance === Math.min(...n.history.map((m) => m.significance)),
+          m.significance === Math.min(...feelings.history.map((m) => m.significance)),
       ),
       1,
     )
 }
-export function helpChance(s: State, n: Kin) {
-  const memory = n.history.reduce(
+export function helpChance(s: Game, n: Person) {
+  const feelings = attitude(s,n)
+  const memory = feelings.history.reduce(
     (v, m) =>
       v +
       (m.id === 'care' || m.id === 'aid'
@@ -89,26 +91,27 @@ export function helpChance(s: State, n: Kin) {
   return clamp(
     0.12 +
       0.24 * n.generosity +
-      0.2 * n.trust +
-      0.1 * n.closeness +
+      0.2 * feelings.trust +
+      0.1 * feelings.closeness +
       0.12 * Number(n.goal === '积谷') +
       0.08 * Number(n.money > 10) -
-      0.1 * n.conflict -
+      0.1 * feelings.conflict -
       0.12 * Number(n.acute !== '') +
       memory,
   )
 }
-export function joinFamily(s: State, p: Kin) {
-  if (s.dead || !p.alive || p.partner || s.spouse || p.id === 'player' || s.npcs.some(n => n.id === p.id))
+export function joinFamily(s: Game, p: Person) {
+  const self = player(s), pid = playerId(s)
+  if (self.dead || !p.alive || partnerOf(s,p.id) || partnerOf(s,pid) || p.id === pid || residents(s).some(n => n.id === p.id))
     throw Error('Invalid household marriage admission: ' + p.id)
-  const serial = ++s.unions,
+  const serial = unionCount(s) + 1,
     origin = 'kin' + serial
   const allocation = { cash: Math.floor(homes[p.background].coins / 2), assets: 1, debt: 0 }
   const r = (k: string) => random(s.seed, origin + k)
   for (const [i, chance] of [0.78, 0.46].entries()) {
     if (r('relative' + i) > chance) continue
     const elder = kin(
-      s,
+      kinContext(s),
       i ? '姻亲长辈（母）' : '姻亲长辈（父）',
       p.age + 20 + Math.floor(r('age' + i) * 15),
       origin + 'elder' + i,
@@ -120,11 +123,12 @@ export function joinFamily(s: State, p: Kin) {
     elder.background = p.background
     elder.work = homes[p.background].work
     if (elder.age >= 60) elder.work = '家中休养'
-    p.parents.push(elder.id)
-    s.npcs.push(elder)
+    const parent = register(s,elder,[])
+    if (canonical(s)) s.parentIds[p.id].push(parent.id)
+    else if ('parents' in p) p.parents.push(parent.id)
   }
   // A later spouse joins the established household, keeping children resident.
-  const elders = s.npcs.some(n => n.house === origin)
+  const elders = residents(s).some(n => n.house === origin)
   const moving = serial === 1 && r('move') < (account(s).cash < 30 ? 0.75 : 0.48)
   if (elders || moving) {
     const destination = elders ? origin : 'independent'
@@ -135,21 +139,27 @@ export function joinFamily(s: State, p: Kin) {
     account(s).cash += allocation.cash
     account(s).assets += allocation.assets
   }
-  p.house = s.residence
-  p.partner = 'player'
-  s.spouse = p.id
-  s.npcs.push(p)
-  for (const id of [origin, s.residence])
-    if (id === s.residence || s.households[id]) s.heads[id] = authority(s, id)
-  s.marriage = serial === 1 ? 'married' : 'remarried'
+  p.house = self.residence
+  if (canonical(s)) {
+    if (s.candidateId !== p.id) throw Error('Unregistered marriage candidate')
+    s.residentOrder.push(p.id)
+    s.candidateId = null
+  } else if ('parents' in p) {
+    s.npcs.push(p)
+    s.unions = serial
+    s.marriage = serial === 1 ? 'married' : 'remarried'
+  }
+  formUnion(s,pid,p.id)
+  for (const id of [origin, self.residence])
+    if (id === self.residence || s.households[id]) s.heads[id] = authority(s, id)
   note(
     s,
     '与' +
       p.name +
       '成家，' +
-      (s.residence === 'birth'
+      (self.residence === 'birth'
         ? '留在原家同住。'
-        : s.residence === 'independent'
+        : self.residence === 'independent'
           ? '另起门户。'
           : '同姻亲合住。'),
   )

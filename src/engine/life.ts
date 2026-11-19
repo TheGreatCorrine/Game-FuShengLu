@@ -19,12 +19,11 @@ export function confirmName(s: Life, name: string) {
 export function advance(s: Life) {
   const p = protagonist(s)
   if (!p.name || p.dead || s.pending) return s
-  let lost: Kin | undefined
   const draft = structuredClone(s)
   beginYear(draft)
   const next = continueYear(withAccountViews(structuredClone(legacyPeopleView(draft))),
-    legacy.eligible, n => { lost = n })
-  return collectPeople(next,draft,lost)
+    legacy.eligible)
+  return collectPeople(next,draft)
 }
 export function decide(s: Life, action: Action) {
   return collectPeople(legacy.decide(legacyPeopleView(s),action),s)

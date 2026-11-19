@@ -102,3 +102,12 @@ export function kinContext(s: Game) {
   const p = player(s)
   return {seed:s.seed,year:s.year,sex:p.sex,home:p.home,surname:p.surname,residence:p.residence}
 }
+
+export const unionCount = (s: Game) => canonical(s)
+  ? s.marriages.filter(u => u.pair.includes(s.playerId)).length : s.unions
+export const currentCandidate = (s: Game): Person|null => canonical(s)
+  ? (s.candidateId ? relative(s,s.candidateId) : null) : s.candidate
+export function clearCandidate(s: Game) {
+  if (canonical(s)) s.candidateId = null
+  else s.candidate = null
+}

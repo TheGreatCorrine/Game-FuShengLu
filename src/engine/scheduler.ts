@@ -1,4 +1,4 @@
-import { player, playerId, keyFor, residents, type Game } from './domain.ts'
+import { canonical, currentCandidate, clearCandidate, player, playerId, keyFor, residents, type Game } from './domain.ts'
 import { account } from './accounts.ts'
 import { environmentFor, household } from './economy.ts'
 import { candidate, fulfill } from './encounters.ts'
@@ -9,20 +9,21 @@ import { changeOccupation } from './operations.ts'
 import { random, weighted } from './rng.ts'
 import type { Kin, State } from './types.ts'
 
-export function record(s: State, text: string, cause?: string) {
-  const entry = { age: s.age, year: s.year, text, cause }
+export function record(s: Game, text: string, cause?: string) {
+  const entry = { age: player(s).age, year: s.year, text, cause }
   s.chronicle.push(entry)
   if (cause) s.ledger.push(entry)
 }
-function mature(s: State) {
-  for (const q of s.queue.filter((q) => q.age === s.age)) {
-    if (s.age === 18 && ['习读', '半日习读'].includes(s.training)) {
+function mature(s: Game) {
+  const p = player(s)
+  for (const q of s.queue.filter((q) => q.age === p.age)) {
+    if (p.age === 18 && ['习读', '半日习读'].includes(p.training)) {
       const ok =
-        s.health > 40 &&
+        p.health > 40 &&
         random(s.seed, 'completion') <
-          0.45 + 0.3 * s.talent + 0.15 * Number(account(s).debt === 0)
-      s.training = ok ? '学成' : '中辍'
-      s.skill += ok ? 3 : 0
+          0.45 + 0.3 * p.talent + 0.15 * Number(account(s).debt === 0)
+      p.training = ok ? '学成' : '中辍'
+      p.skill += ok ? 3 : 0
       record(
         s,
         ok
@@ -32,9 +33,9 @@ function mature(s: State) {
       )
     }
   }
-  s.queue = s.queue.filter((q) => q.age > s.age)
+  s.queue = s.queue.filter((q) => q.age > p.age)
 }
-export function beginYear(s: Game) {
+export function beginYear(s: Game, onCandidateDeath?: (person: Kin) => void) {
   const p = player(s)
   if (!p.name || p.dead || s.pending) throw Error('Year cannot advance')
   const key = keyFor(s,playerId(s))
@@ -47,23 +48,19 @@ export function beginYear(s: Game) {
   finishResidentDeaths(s,ageResidents(s,residents(s),id => keyFor(s,id)))
   household(s)
   if (!p.dead) developFamily(s)
-}
-
-export function continueYear(s: State, events: (s: State) => {id:string; weight:number}[],
-  onCandidateDeath?: (person: Kin) => void): State {
-  if (!s.health) {
-    s.dead = true
+  if (!p.health) {
+    p.dead = true
     record(
       s,
-      s.acute
-        ? '这场' + (s.acute === '受伤' ? '伤' : '病') + '后，你未能恢复。'
+      p.acute
+        ? '这场' + (p.acute === '受伤' ? '伤' : '病') + '后，你未能恢复。'
         : '此生至此，年谱收卷。',
     )
-    return s
+    return
   }
   fulfill(s)
-  if (s.candidate) {
-    const n = s.candidate
+  const n = currentCandidate(s)
+  if (n) {
     n.age++
     const h = annualHealth(
       n.age,
@@ -71,26 +68,34 @@ export function continueYear(s: State, events: (s: State) => {id:string; weight:
       0.5,
       s.env.disease,
       false,
-      (k) => random(s.seed, n.id + k + s.year),
+      (k) => random(s.seed, keyFor(s,n.id) + k + s.year),
       s.mortality,
     )
     n.health = h.health
     if (h.dead) {
-      onCandidateDeath?.({ ...n, alive: false, acute: h.acute })
-      s.candidate = null
+      n.alive = false
+      n.acute = h.acute
+      if (!canonical(s) && 'parents' in n) onCandidateDeath?.(n)
+      clearCandidate(s)
       s.wedding.attempts++
       record(s, n.name + '的故讯传来，先前的婚议就此作罢。')
     }
   }
   mature(s)
-  if (s.age >= 15 && s.training !== '习读' && !s.acute) s.practice++
+  if (p.age >= 15 && p.training !== '习读' && !p.acute) p.practice++
   const job = livelihood(s)
-  if (job !== s.work) {
-    changeOccupation(s, job)
+  if (job !== p.work) {
+    changeOccupation(p, job)
     record(s, '开始' + job + '。', job === '佐理文书' ? 'turn' : undefined)
   }
-  if (s.wedding.state === 'deferred' && s.age >= s.wedding.next)
+  if (s.wedding.state === 'deferred' && p.age >= s.wedding.next)
     s.wedding.state = 'eligible'
+
+}
+
+export function continueYear(s: State, events: (s: State) => {id:string; weight:number}[],
+  ): State {
+  if (s.dead) return s
   const pool = events(s),
     turn = pool.find((e) => e.id === 'turn')
   if (turn) s.pending = turn.id

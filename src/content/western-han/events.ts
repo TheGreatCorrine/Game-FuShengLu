@@ -1,9 +1,10 @@
+import { canonical, currentCandidate, player, kinContext, register, unionCount, type Game, type Person } from '../../engine/domain.ts'
 import { account } from '../../engine/accounts.ts'
 import { kin } from '../../engine/family.ts'
 import { authority, spendable } from '../../engine/legal.ts'
 import { random } from '../../engine/rng.ts'
 import type { Action } from './catalog.ts'
-import type { State } from '../../engine/types.ts'
+import type { Kin, State } from '../../engine/types.ts'
 import { homes, rules, scenes } from './catalog.ts'
 
 const living = (s: State) => s.npcs.filter(n => n.alive)
@@ -62,19 +63,31 @@ export function eligible(s: State) {
     .filter((e) => e.choices.length > 0)
 }
 
-export function candidate(s: State) {
-  if (s.candidate) return s.candidate
+export function candidate(s: State): Kin
+export function candidate(s: Game): Person
+export function candidate(s: Game) {
+  const existing = currentCandidate(s)
+  if (existing) return existing
+  return candidateTemplate(s)
+}
+function candidateTemplate(s: Game) {
   const p = kin(
-    s,
+    kinContext(s),
     '伴侣',
-    s.age + 1,
-    'spouse' + (s.unions + 1) + '-' + s.wedding.attempts,
+    player(s).age + 1,
+    'spouse' + (unionCount(s) + 1) + '-' + s.wedding.attempts,
   )
   p.background = Math.floor(
     random(s.seed, 'match' + s.wedding.attempts) * homes.length,
   )
   p.work = homes[p.background].work
   return p
+}
+export function bindCandidate(s: Game) {
+  if (currentCandidate(s)) return
+  const template = candidateTemplate(s)
+  if (canonical(s)) s.candidateId = register(s,template,[],true).id
+  else s.candidate = template
 }
 export function participant(s: State, id: string) {
   const local = s.npcs.filter((n) => n.alive && n.house === s.residence)
