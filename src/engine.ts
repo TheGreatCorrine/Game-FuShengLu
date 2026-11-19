@@ -448,9 +448,15 @@ export function decide(input: State, action: Action): State {
       break
     }
     case 'work': {
-      const pay = r < 0.8 ? 3 : 0
-      s.purse += pay
-      result = pay ? '做完了活，荷包添了三钱。' : '忙了一日，未能挣得工钱。'
+      if (cause === 'turn' || cause === 'studyConflict') {
+        result = '你回家分担日常劳作。'
+      } else if (cause === 'offer') {
+        result = '你推辞了核账的差事，继续原来的生计。'
+      } else {
+        const pay = r < 0.8 ? 3 : 0
+        s.purse += pay
+        result = pay ? '做完了活，荷包添了三钱。' : '忙了一日，未能挣得工钱。'
+      }
       if (cause === 'studyConflict') {
         s.training = '中辍'
         s.queue = s.queue.filter((q) => q.cause !== 'turn')

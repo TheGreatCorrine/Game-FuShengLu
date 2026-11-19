@@ -131,3 +131,13 @@ it('deferring a proposal leaves all four accounts unchanged', () => {
   const after = decide(s,'pass')
   for(const key of ['purse','cash','debt','loans'] as const) expect(after[key]).toEqual(s[key])
 })
+
+it('keeps household work and declining a job off the personal payroll', () => {
+  for (let i = 0; i < 12; i++) {
+    const s = confirmName(generate('payroll' + i), '安')
+    Object.assign(s, { age: 15, pending: 'turn' })
+    expect(decide(s, 'work').purse).toBe(s.purse)
+    Object.assign(s, { age: 28, training: '学成', pending: 'offer' })
+    expect(decide(s, 'work').purse).toBe(s.purse)
+  }
+})
