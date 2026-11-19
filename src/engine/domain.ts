@@ -85,3 +85,20 @@ export function inLawParents(s: Game, house: string) {
   return s.marriages.filter(u => u.pair.includes(s.playerId))
     .flatMap(u => parentsOf(s,u.pair.find(id => id !== s.playerId)!))
 }
+
+export function formUnion(s: Game, first: string, second: string) {
+  if (first === second || partnerOf(s,first) || partnerOf(s,second))
+    throw Error('Invalid union: '+first+' / '+second)
+  if (canonical(s)) {
+    s.marriages.push({pair:[first,second],start:s.year,end:null})
+  } else {
+    for (const [a,b] of [[first,second],[second,first]]) {
+      if (a === 'player') s.spouse = b
+      else s.npcs.find(n => n.id === a)!.partner = b
+    }
+  }
+}
+export function kinContext(s: Game) {
+  const p = player(s)
+  return {seed:s.seed,year:s.year,sex:p.sex,home:p.home,surname:p.surname,residence:p.residence}
+}

@@ -1,4 +1,4 @@
-import { player, playerId, keyFor, residents, type Game } from './domain.ts'
+import { attitude, player, playerId, keyFor, residents, type Game } from './domain.ts'
 import { account } from './accounts.ts'
 import { authority } from '../content/western-han/authority.ts'
 export { authority }
@@ -37,32 +37,32 @@ export type LegalRuleset = {
 }
 export const outstanding = (s: Game, id: string) =>
   s.loans.filter((l) => l.debtor === id).reduce((a, l) => a + l.balance, 0)
-export function spendable(s: State) {
+export function spendable(s: Game) {
   return Math.max(
     0,
-    s.purse - Math.min(rules.legalRules.reserve, outstanding(s, 'player')),
+    player(s).purse - Math.min(rules.legalRules.reserve, outstanding(s, playerId(s))),
   )
 }
-export function credit(s: State, person = 'player') {
-  const n = s.npcs.find((k) => k.id === person),
-    house = n?.house ?? s.residence,
-    age = n?.age ?? s.age
+export function credit(s: Game, person = playerId(s)) {
+  const n = residents(s).find((k) => k.id === person),
+    house = n?.house ?? player(s).residence,
+    age = n?.age ?? player(s).age
   const book = account(s, house)
   const head = authority(s, house),
-    sponsor = s.npcs.find((k) => k.id === head)
+    sponsor = residents(s).find((k) => k.id === head)
   const backing =
-    !!sponsor && sponsor.trust + sponsor.generosity > 1 && book.assets > 0
+    !!sponsor && attitude(s,sponsor).trust + sponsor.generosity > 1 && book.assets > 0
   const security =
-    (person === 'player' ? s.purse : (n?.money ?? 0)) +
+    (person === playerId(s) ? player(s).purse : (n?.money ?? 0)) +
     (head === person ? book.assets * 4 : 0)
-  if (age < 15 || s.dead || (n && !n.alive)) return '借主眼下不能亲自立约。'
+  if (age < 15 || player(s).dead || (n && !n.alive)) return '借主眼下不能亲自立约。'
   if (outstanding(s, person) >= rules.legalRules.loanSize)
     return '旧借未清，出借人不愿再垫。'
   if (security < 3 && !backing) return '手中没有足够私蓄，也无人愿意作保。'
   const disposition = random(s.seed, 'lender' + house)
   if (
     rules.legalRules.needsAssent(
-      n?.sex ?? s.sex,
+      n?.sex ?? player(s).sex,
       head !== person && security < 6,
       disposition,
     ) &&
@@ -74,7 +74,7 @@ export function credit(s: State, person = 'player') {
   return ''
 }
 export function borrow(
-  s: State,
+  s: Game,
   id: string,
   amount = rules.legalRules.loanSize,
 ) {
@@ -85,8 +85,8 @@ export function borrow(
     credit(s, id)
   )
     return false
-  const person = s.npcs.find((n) => n.id === id)
-  if (id !== 'player' && !person) return false
+  const person = residents(s).find((n) => n.id === id)
+  if (id !== playerId(s) && !person) return false
   s.loans.push({
     id: 'loan' + s.loans.length,
     debtor: id,
@@ -98,7 +98,7 @@ export function borrow(
     writtenOff: 0,
   })
   if (person) person.money += amount
-  else s.purse += amount
+  else player(s).purse += amount
   return true
 }
 export function repay(s: Game, id: string, available: number) {

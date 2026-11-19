@@ -12,7 +12,7 @@ export function account(s: Pick<State,'households'|'residence'> | Life, id = 're
   return s.households[id]
 }
 
-export function openHouse(s: Snapshot, id: string, balances: Estate) {
+export function openHouse(s: Pick<State,'households'|'closedHouses'>, id: string, balances: Estate) {
   if (Object.hasOwn(s.households, id) || Object.hasOwn(s.closedHouses, id))
     throw Error('Duplicate household: ' + id)
   Object.defineProperty(s.households, id, {
@@ -20,17 +20,18 @@ export function openHouse(s: Snapshot, id: string, balances: Estate) {
   })
 }
 
-export function moveResidence(s: Snapshot, destination: string) {
+export function moveResidence(s: Snapshot | Life, destination: string) {
   account(s, destination)
-  if (s.residence === destination) return
+  const p = 'residence' in s ? s : protagonist(s)
+  if (p.residence === destination) return
   // Legacy settlement visited current first, then other books in insertion order.
-  const previous = s.residence
+  const previous = p.residence
   const book = account(s, previous)
   delete s.households[previous]
   Object.defineProperty(s.households, previous, {
     value: book, writable: true, enumerable: true, configurable: true,
   })
-  s.residence = destination
+  p.residence = destination
 }
 
 function formerBooks(s: Snapshot) {
