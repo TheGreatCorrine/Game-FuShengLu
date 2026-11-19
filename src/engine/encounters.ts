@@ -1,3 +1,4 @@
+import { payHouseDebt, changeOccupation } from './operations.ts'
 import { account, openHouse } from './accounts.ts'
 import { homes } from '../data.ts'
 import type { State, Kin } from './types.ts'
@@ -186,7 +187,7 @@ export function negotiate(s: State, n: Kin, id: string, a: Action, r: number) {
     }
     case 'apprentice':
       if (yes) {
-        n.work = '织作'
+        changeOccupation(n, '织作')
         remember(s, n, 'introduction', 0.08)
         return n.name + '愿意先试你介绍的织活，暂留原户。'
       }
@@ -194,13 +195,13 @@ export function negotiate(s: State, n: Kin, id: string, a: Action, r: number) {
       return n.name + '谢过你，说还是想自己谋出路。'
     case 'stake':
       s.purse -= 3
-      n.work = '织作'
+      changeOccupation(n, '织作')
       remember(s, n, 'aid', 0.1)
       return n.name + '用你出的三钱置线，接下第一匹布。'
     case 'trial':
       s.practice++
       if (n.ambition + r > 0.8) {
-        n.work = '织作'
+        changeOccupation(n, '织作')
         remember(s, n, 'trial', 0.06)
         return n.name + '自己接下织活，你接手了一部分家务。'
       }
@@ -208,7 +209,7 @@ export function negotiate(s: State, n: Kin, id: string, a: Action, r: number) {
     case 'object':
       remember(s, n, 'dispute', -0.07)
       if (n.ambition + r > 1.2) {
-        n.work = '织作'
+        changeOccupation(n, '织作')
         return n.name + '听完仍接了织活：“这一次，我想自己拿主意。”'
       }
       return n.name + '收起了线样，暂且继续原来的生计。'
@@ -248,9 +249,7 @@ export function fulfill(s: State) {
   const n = s.npcs.find((n) => n.id === p.id && n.alive && n.house === 'birth'),
     book = s.residence === 'birth' ? undefined : s.households.birth
   if (!n || !book || s.dead || !book.debt) return
-  const amount = Math.min(6, s.purse, book.debt)
-  s.purse -= amount
-  book.debt -= amount
+  const amount = payHouseDebt(s, book, 6)
   remember(s, n, amount ? 'aid' : 'brokenPromise', amount ? 0.12 : -0.09)
   const entry = {
     age: s.age,

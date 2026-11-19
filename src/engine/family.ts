@@ -1,3 +1,4 @@
+import { payHouseDebt, changeOccupation, transferSavings } from './operations.ts'
 import { authority, settle, borrow, outstanding, repay } from './legal.ts'
 import type { State, Kin } from './types.ts'
 import { homes, rules } from '../data.ts'
@@ -53,6 +54,8 @@ const note = (s: State, text: string) =>
   s.chronicle.push({ age: s.age, year: s.year, text })
 const clamp = (v: number) => Math.min(1, Math.max(0, v))
 export function remember(s: State, n: Kin, id: string, trust: number) {
+  if (!n.alive || (!s.npcs.includes(n) && s.candidate !== n) || !id || !Number.isFinite(trust))
+    throw Error('Invalid relationship update: ' + n.id)
   n.trust = clamp(n.trust + trust)
   n.conflict = clamp(n.conflict - trust)
   n.history.push({
@@ -95,6 +98,8 @@ export function helpChance(s: State, n: Kin) {
   )
 }
 export function joinFamily(s: State, p: Kin) {
+  if (s.dead || !p.alive || p.partner || s.spouse || p.id === 'player' || s.npcs.some(n => n.id === p.id))
+    throw Error('Invalid household marriage admission: ' + p.id)
   const serial = ++s.unions,
     origin = 'kin' + serial
   const allocation = { cash: Math.floor(homes[p.background].coins / 2), assets: 1, debt: 0 }
@@ -148,24 +153,39 @@ export function joinFamily(s: State, p: Kin) {
           : '同姻亲合住。'),
   )
 }
-export function resolveKinHealth(s: State) {
+type HealthWorld = Pick<State,'seed'|'year'|'env'|'mortality'|'households'>
+type Resident = Pick<Kin,'id'|'age'|'alive'|'health'|'acute'> & { house: string | null }
+
+// Traversal order controls the subsequent death notices and estate settlements.
+export function ageResidents(world: HealthWorld, residents: Resident[], keyFor: (id:string) => string) {
   const deaths: string[] = []
-  for (const n of s.npcs.filter((n) => n.alive)) {
+  for (const n of residents) {
+    if (!n.alive) continue
+    const key = keyFor(n.id)
+    if (!key || n.house === null || !Object.hasOwn(world.households,n.house))
+      throw Error('Missing resident health context: ' + n.id)
     n.age++
-    const health = annualHealth(
-      n.age,
-      n.health,
-      random(s.seed, n.id + 'frailty'),
-      s.env.disease,
-      account(s, n.house).debt > 0,
-      (k) => random(s.seed, n.id + k + s.year),
-      s.mortality,
-    )
-    n.health = health.health
-    n.acute = health.acute
-    if (!health.dead) continue
-    n.alive = false
-    deaths.push(n.id)
+    const outcome = annualHealth(n.age, n.health, random(world.seed, key + 'frailty'),
+      world.env.disease, world.households[n.house].debt > 0,
+      k => random(world.seed, key + k + world.year), world.mortality)
+    n.health = outcome.health
+    n.acute = outcome.acute
+    if (outcome.dead) {
+      n.alive = false
+      deaths.push(key)
+    }
+  }
+  return deaths
+}
+
+export function resolveKinHealth(s: State) {
+  finishResidentDeaths(s, ageResidents(s, s.npcs, id => id))
+}
+
+export function finishResidentDeaths(s: State, deaths: string[]) {
+  for (const id of deaths) {
+    const n = s.npcs.find(person => person.id === id)
+    if (!n || n.alive) throw Error('Invalid resident death: ' + id)
     note(s, n.role + ' ' + n.name + ' 离世。')
     if (n.partner && n.partner !== 'player') {
       const survivor = s.npcs.find((k) => k.id === n.partner)
@@ -203,8 +223,7 @@ export function developFamily(s: State) {
         !outstanding(s, n.id) &&
         borrow(s, n.id)
       ) {
-        n.money -= 8
-        book.debt -= 8
+        payHouseDebt(n, book, 8)
         note(s, n.name + '以自己的名义借了八钱，替家中还欠。')
       } else if (n.money > 4 && outstanding(s, n.id)) {
         n.money -= repay(s, n.id, n.money - 4)
@@ -232,7 +251,7 @@ export function developFamily(s: State) {
       n.work !== '织作' &&
       r < 0.1 + 0.18 * n.ambition + 0.12 * Number(n.goal === '积谷')
     ) {
-      n.work = '织作'
+      changeOccupation(n, '织作')
       n.position = ''
       note(
         s,
@@ -262,8 +281,7 @@ export function developFamily(s: State) {
         note(s, n.name + ' 腾出工夫教' + pupil.name + ' 辨认木简。')
       }
     } else if (n.goal === '积谷' && r < 0.18 && book.cash >= 2) {
-      book.cash -= 2
-      n.money += 2
+      transferSavings(book, n, 2)
       if (
         n.money >= 20 &&
         book.debt === 0 &&

@@ -26,18 +26,23 @@ function difference(a,b,path=[]) {
 }
 for (let i=0;i<Number(process.argv[4]??600);i++) {
   const seed='quality'+i
-  let a=old.generate(seed), b=current.generate(seed), previous, command='generate'
+  let oldState=old.generate(seed), b=current.generate(seed), previous, command='generate'
+  const canonical = 'people' in oldState
   while(true) {
+    const a=canonical ? old.legacyPeopleView(oldState) : oldState
     const view=current.legacyPeopleView(b)
     const ctx={policy,seed,age:a.age,command,householdId:a.residence}
     function check(x,y,field) {
       if (isDeepStrictEqual(x,y)) return
       const d=difference(x,y)
       const index=d?.path.indexOf('npcs')
-      const person=index>=0?a.npcs[d.path[index+1]]?.id:null
-      throw Error(JSON.stringify({...ctx,person,field,...d}))
+      const person=index>=0?a.npcs[d.path[index+1]]?.id:
+        ['people','parentIds','towardPlayer','legacyKeys'].includes(d?.path[0]) ? d.path[1] : null
+      const householdId=d?.path.includes('households') ? d.path[d.path.indexOf('households')+1] : ctx.householdId
+      throw Error(JSON.stringify({...ctx,householdId,person,field,...d}, (_key,v)=>v===undefined?'<absent>':v))
     }
     try {
+      if (canonical) check(oldState,b,'canonical')
       current.validatePeople(b)
       if(previous) for(const [id,key] of Object.entries(previous.legacyKeys)) check(key,b.legacyKeys[id],'stable.'+id)
       check(a.households,b.households,'accounts')
@@ -54,7 +59,7 @@ for (let i=0;i<Number(process.argv[4]??600);i++) {
     previous=b
     if (!a.name) {
       command='confirmName'
-      a=old.confirmName(a,'宁');b=current.confirmName(b,'宁')
+      oldState=old.confirmName(oldState,'宁');b=current.confirmName(b,'宁')
     } else if(a.pending) {
       const options=old.eligible(a).find(e=>e.id===a.pending).choices
       check(options,eligible(view).find(e=>e.id===view.pending)?.choices,'choices')
@@ -62,10 +67,10 @@ for (let i=0;i<Number(process.argv[4]??600);i++) {
       const action=policy==='random'?actions[Math.floor(old.random(seed,'policy'+a.age)*actions.length)]
         :priorities[policy].find(x=>actions.includes(x))??actions[0]
       command='decide:'+action
-      a=old.decide(a,action);b=current.decide(b,action)
+      oldState=old.decide(oldState,action);b=current.decide(b,action)
     } else {
       command='advance'
-      a=old.advance(a);b=current.advance(b)
+      oldState=old.advance(oldState);b=current.advance(b)
     }
   }
 }

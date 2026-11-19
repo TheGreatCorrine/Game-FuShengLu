@@ -154,32 +154,42 @@ export function settle(
   if (s.settlements.some((e) => e.owner === id)) return
   const n = s.npcs.find((k) => k.id === id)
   if (id === 'player' ? !s.dead : !n || n.alive) return
-  const assets = n ? n.money : s.purse,
-    liabilities = outstanding(s, id),
-    paid = repay(s, id, rule.recover(assets, liabilities))
-  for (const l of s.loans.filter((l) => l.debtor === id)) {
+  const assets = n ? n.money : s.purse
+  const liabilities = outstanding(s, id)
+  const paid = rule.recover(assets, liabilities)
+  const validAmount = (v: number) => Number.isSafeInteger(v) && v >= 0
+  if (![assets, liabilities, paid].every(validAmount) || paid > Math.min(assets, liabilities))
+    throw Error('Invalid estate recovery: ' + id)
+
+  // Eligibility belongs to the dynasty. Identity, conservation and ordering
+  // are engine contracts and are checked before applying any payment.
+  const ids = rule.eligible(s, id).sort()
+  const heirs = ids.map(heir => heir === 'player' ? s : s.npcs.find(k => k.id === heir))
+  if (new Set(ids).size !== ids.length || heirs.some(heir => !heir || ('dead' in heir ? heir.dead : !heir.alive)))
+    throw Error('Invalid estate recipients: ' + id)
+  const book = ids.length ? null : account(s, n?.house ?? s.residence)
+  const gross = rule.divide(assets, ids), charges = rule.divide(paid, ids)
+  if (gross.length !== ids.length || charges.length !== ids.length ||
+      (ids.length && (gross.reduce((a,b)=>a+b,0) !== assets || charges.reduce((a,b)=>a+b,0) !== paid)))
+    throw Error('Invalid estate division: ' + id)
+  const shares = ids.map((heir, i) => {
+    if (!validAmount(gross[i]) || !validAmount(charges[i]) || charges[i] > gross[i])
+      throw Error('Invalid estate share: ' + heir)
+    return {id: heir, gross: gross[i], charge: charges[i], net: gross[i] - charges[i]}
+  })
+  repay(s, id, paid)
+  for (const l of s.loans.filter(l => l.debtor === id)) {
     l.writtenOff += l.balance
     l.balance = 0
   }
-  const ids = rule.eligible(s, id).sort()
-  const gross = rule.divide(assets, ids),
-    charges = rule.divide(paid, ids)
-  const shares = ids.map((heir, i) => ({
-    id: heir,
-    gross: gross[i],
-    charge: charges[i],
-    net: gross[i] - charges[i],
-  }))
   if (n) n.money = 0
   else s.purse = 0
-  for (const share of shares) {
-    if (share.id === 'player') s.purse += share.net
-    else s.npcs.find((k) => k.id === share.id)!.money += share.net
+  for (const [i, share] of shares.entries()) {
+    const heir = heirs[i]!
+    if ('purse' in heir) heir.purse += share.net
+    else heir.money += share.net
   }
-  if (!shares.length) {
-    const house = n?.house ?? s.residence
-    account(s, house).cash += assets - paid
-  }
+  if (book) book.cash += assets - paid
   s.settlements.push({
     owner: id,
     rule: rule.id,

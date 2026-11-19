@@ -5,7 +5,7 @@ import type { State } from './types.ts'
 import { random } from './rng.ts'
 import { history } from '../data.ts'
 import { yields } from './livelihood.ts'
-export function yearImpact(s: State) {
+export function yearImpact(s: Pick<State,'year'|'region'|'age'|'home'>) {
   return history
     .filter((e) => s.year >= 1 - e.from && s.year <= 1 - e.to)
     .map((e) => {
@@ -27,10 +27,13 @@ export function yearImpact(s: State) {
     })
 }
 export function environment(s: State) {
-  const impacts = yearImpact(s),
+  s.env = environmentFor(s, s)
+}
+export function environmentFor(s: Pick<State,'year'|'region'|'seed'>, p: Pick<State,'age'|'home'>) {
+  const impacts = yearImpact({year:s.year,region:s.region,age:p.age,home:p.home}),
     load = impacts.reduce((v, e) => v + e.load, 0)
   const harvest = 0.7 + 0.6 * random(s.seed, 'harvest' + s.year)
-  s.env = {
+  return {
     trade: 1 - load * 0.11,
     price: 1 + load * 0.09,
     disease: 0.12 + (1 - harvest) * 0.2 + load * 0.08,
