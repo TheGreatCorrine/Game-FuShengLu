@@ -1,3 +1,4 @@
+import { childhoodNote, childhoodPause, childhoodScene } from '../content/western-han/childhood.ts'
 import { bindCandidate, eligible } from '../content/western-han/events.ts'
 import { canonical, currentCandidate, clearCandidate, player, playerId, keyFor, residents, type Game } from './domain.ts'
 import { account } from './accounts.ts'
@@ -91,9 +92,14 @@ export function runYear(s: Game, onCandidateDeath?: (person: Kin) => void) {
   }
   if (s.wedding.state === 'deferred' && p.age >= s.wedding.next)
     s.wedding.state = 'eligible'
-  const pool = eligible(s),
+  const note = childhoodNote(s)
+  if (note) record(s,note)
+  const eligibleScenes = eligible(s)
+  const childhood = childhoodPause(s,eligibleScenes)
+  const pool = eligibleScenes.filter(e => !childhoodScene(e.id)),
     turn = pool.find((e) => e.id === 'turn')
   if (turn) s.pending = turn.id
+  else if (childhood) s.pending = childhood
   else if (pool.length && random(s.seed, 'pause' + p.age) < 0.29)
     s.pending =
       pool[

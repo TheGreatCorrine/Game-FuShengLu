@@ -1,3 +1,4 @@
+import { childhoodScenes } from './childhood.ts'
 import { player, playerId, parentsOf, residents } from '../../engine/domain.ts'
 import type { LegalRuleset } from '../../engine/legal.ts'
 // Dates use positive BCE labels here. The engine clock uses astronomical years.
@@ -101,6 +102,7 @@ export const history = [
   },
 ]
 export type Action =
+  | 'childFirst' | 'childSecond' | 'childStudy' | 'childCraft'
   | 'learn'
   | 'work'
   | 'bond'
@@ -128,7 +130,7 @@ export type Action =
   | 'meet'
   | 'waitPlan'
   | 'trialSkill'
-type Scene = {
+export type Scene = {
   id: string
   min: number
   max: number
@@ -202,6 +204,7 @@ const everyday: Record<string, [string, Action][]> = {
   ],
 }
 export const scenes: Scene[] = [
+  ...childhoodScenes,
   {
     id: 'siblingPlan',
     min: 13,

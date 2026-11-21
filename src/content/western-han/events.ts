@@ -1,3 +1,4 @@
+import { childhoodScene, companion, preparedChoice } from './childhood.ts'
 import { marriageSummary } from '../../engine/people.ts'
 import { inLawParents, attitude, birthSibling, parentsOf, partnerOf, playerId, residents, keyFor, canonical, currentCandidate, player, kinContext, register, unionCount, type Game, type Person } from '../../engine/domain.ts'
 import { account } from '../../engine/accounts.ts'
@@ -32,6 +33,7 @@ export function eligible(s: Game) {
         !p.dead &&
         p.age >= e.min &&
         p.age <= e.max &&
+        (!childhoodScene(e.id) || !!companion(s,e.id)) &&
         (!s.seen.includes(e.id) || e.id === 'wedding' || e.id === 'collect') &&
         (e.id !== 'relief' ||
           (account(s).debt >= 8 &&
@@ -60,7 +62,7 @@ export function eligible(s: Game) {
     )
     .map((e) => ({
       ...e,
-      choices: e.choices.filter(([, a]) => allowed(s, e.id, a)),
+      choices: e.choices.filter(([, a]) => allowed(s, e.id, a)).concat(e.id === 'turn' ? preparedChoice(s) : []),
     }))
     .filter((e) => e.choices.length > 0)
 }
@@ -94,6 +96,7 @@ export function bindCandidate(s: Game) {
 export function participant(s: State, id:string): Kin | undefined
 export function participant(s: Game, id:string): Person | undefined
 export function participant(s: Game, id: string) {
+  if (childhoodScene(id)) return companion(s,id)
   const local = residents(s).filter((n) => n.alive && n.house === player(s).residence)
   if (id === 'turn' || id === 'studyConflict' || id === 'letters')
     return local.find((n) => n.id === authority(s, player(s).residence))
@@ -162,6 +165,7 @@ export function narrative(s: Game, id: string, body: string) {
   const n = participant(s, id)
   if (!n) return body
   const who = n.role + ' ' + n.name
+  if (childhoodScene(id)) return who + body
   switch (id) {
     case 'studyConflict':
       return who + '把简册合上：“近来家中缺人，往后的课能不能少去些？”'

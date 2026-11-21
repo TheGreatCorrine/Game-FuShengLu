@@ -1,3 +1,4 @@
+import { childhoodScene, preparation } from '../content/western-han/childhood.ts'
 import { eligible, participant, bindCandidate } from '../content/western-han/events.ts'
 import { homes, type Action } from '../data.ts'
 import { account } from './accounts.ts'
@@ -45,10 +46,33 @@ export function resolveChoice(s: Game, action: Action) {
       cause + 'result' + (cause === 'wedding' ? s.wedding.attempts : ''),
     )
   let result = ''
+  let fact: string | undefined
   let actors: string[] = []
   if (cause === 'wedding') bindCandidate(s)
   const involved = participant(s, cause)
   switch (action) {
+    case 'childFirst':
+    case 'childSecond': {
+      const [,lesson,text] = childhoodScene(cause)!.outcomes[action === 'childFirst' ? 0 : 1]
+      const n = involved!
+      actors = [n.id]
+      fact = 'childhood/'+lesson
+      if (lesson === 'letters') p.skill++
+      if (lesson === 'hands') p.practice++
+      remember(s,n,cause,lesson === 'company' ? 0.12 : 0.04)
+      n.memories.push('曾与你一道经历「'+event.title+'」')
+      result = n.name+'与你一道。'+text
+      break
+    }
+    case 'childCraft': {
+      const {mentor,entry} = preparation(s,'hands')!
+      actors = [mentor.id]
+      p.practice += 3
+      p.training = '留家'
+      remember(s,mentor,'childCraft',0.08)
+      result = mentor.name+'提起你'+entry.age+'岁那次「'+childhoodScene(entry.cause!)!.title+'」，这次把整件活交给你，自己只在旁指点。'
+      break
+    }
     case 'trialSkill':
       p.practice++
       result = '你照着示范动手做了一遍，记下其中的手法。'
@@ -150,11 +174,13 @@ export function resolveChoice(s: Game, action: Action) {
       }
       break
     }
+    case 'childStudy':
     case 'learn': {
+      const link = action === 'childStudy' ? preparation(s,'letters') : undefined
       const ok =
         (account(s).cash >= 5 ||
           (!!adult && account(s).cash + adult.money >= 5 && adult.generosity > 0.7)) &&
-        r < (adult ? support(s, adult) : 0.15)
+        r < Math.min(0.95,(adult ? support(s, adult) : 0.15) + (link ? 0.12 : 0))
       if (adult) {
         remember(s, adult, ok ? 'study' : 'dispute', ok ? 0.06 : -0.09)
         adult.memories.push(ok ? '应允识字' : '未应允识字')
@@ -183,6 +209,10 @@ export function resolveChoice(s: Game, action: Action) {
               : adult.generosity > 0.55
                 ? '收好简册：“我先替你留着。等家里缓一缓。”'
                 : '摇头：“明早缺人。这回先跟我去。”')
+      if (link) {
+        actors = [...new Set([link.mentor.id,...(adult ? [adult.id] : [])])]
+        result = link.mentor.name+'提起你'+link.entry.age+'岁辨认旧字的事。'+result
+      }
       if (cause === 'turn') {
         p.training = ok ? '习读' : '未入学'
         if (ok) s.queue.push({ age: 18, cause })
@@ -281,7 +311,7 @@ export function resolveChoice(s: Game, action: Action) {
       purse: p.purse - before.purse,
       practice: p.practice - before.practice,
     },
-    fact: p.training || p.work,
+    fact: fact ?? (p.training || p.work),
   })
   if (
     !s.seen.includes(cause) &&
