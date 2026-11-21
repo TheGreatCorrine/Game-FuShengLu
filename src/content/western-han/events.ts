@@ -1,5 +1,5 @@
 import { marriageSummary } from '../../engine/people.ts'
-import { attitude, birthSibling, parentsOf, partnerOf, playerId, residents, keyFor, canonical, currentCandidate, player, kinContext, register, unionCount, type Game, type Person } from '../../engine/domain.ts'
+import { inLawParents, attitude, birthSibling, parentsOf, partnerOf, playerId, residents, keyFor, canonical, currentCandidate, player, kinContext, register, unionCount, type Game, type Person } from '../../engine/domain.ts'
 import { account } from '../../engine/accounts.ts'
 import { kin } from '../../engine/family.ts'
 import { authority, spendable } from '../../engine/legal.ts'
@@ -118,8 +118,13 @@ export function participant(s: Game, id: string) {
         n.work !== '织作' &&
         (n.ambition > 0.5 || (n.goal === '积谷' && account(s).debt > 0)),
     )
-  if (id === 'feast')
+  if (id === 'feast') {
+    if (canonical(s)) {
+      const elders = [...parentsOf(s,s.playerId), ...inLawParents(s,player(s).residence)]
+      return local.find(n => elders.includes(n.id))
+    }
     return local.find(n => ['父亲','母亲','姻亲长辈（父）','姻亲长辈（母）'].includes(n.role))
+  }
   if (id === 'medicine')
     return local
       .filter((n) => n.acute)

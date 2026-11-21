@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest'
 import { advance, confirmName, decide, generate, skip } from '../src/engine/life.ts'
 import { observePlayer } from '../src/engine/observation.ts'
-import { bindCandidate } from '../src/content/western-han/events.ts'
+import { bindCandidate, participant } from '../src/content/western-han/events.ts'
 import { joinFamily } from '../src/engine/family.ts'
 import { currentCandidate, player, partnerOf } from '../src/engine/domain.ts'
 
@@ -23,9 +23,10 @@ it('generates, advances, skips, observes and resolves complete lives with snapsh
       if (view.phase !== 'named') throw Error('Expected named life')
       if (view.dead) break
       const scene = view.scene!
-      const original = structuredClone(life)
+      const input = life
+      const original = structuredClone(input)
       life = decide(life,scene.choices[0][1])
-      expect(original.pending).toBeTruthy()
+      expect(input).toEqual(original)
       expect(life.pending).toBe('')
       decisions++
     } while (!player(life).dead)
@@ -47,4 +48,13 @@ it('admits only the registered candidate and preserves their identity and accoun
   expect(s.residentOrder.filter(id => id === n.id)).toHaveLength(1)
   expect(s.people[n.id]).toBe(n)
   expect(s.households[player(s).residence]).toBeDefined()
+})
+
+it('resolves the feast elder by parentage even when the display label changes', () => {
+  const s = generate('quality7')
+  const id = s.parentIds[s.playerId][0]
+  const father = s.people[id]
+  if (father.kind !== 'relative') throw Error('Expected parent')
+  father.role = '家人'
+  expect(participant(s,'feast')?.id).toBe(id)
 })
