@@ -1,4 +1,4 @@
-import { canonical, attitude, unionCount, currentCandidate, type Person, birthSibling, siblingMate, parentsOf, keyFor, register, formUnion, kinContext, player, playerId, residents, partnerOf, endUnion, type Game } from './domain.ts'
+import { canonical, attitude, unionCount, currentCandidate, type Person, birthSibling, siblingUnionContact, parentsOf, keyFor, register, formUnion, kinContext, player, playerId, residents, partnerOf, endUnion, type Game } from './domain.ts'
 import { payHouseDebt, changeOccupation, transferSavings } from './operations.ts'
 import { authority, settle, borrow, outstanding, repay } from './legal.ts'
 import type { State, Kin } from './types.ts'
@@ -306,7 +306,7 @@ export function developFamily(s: Game) {
     !sib.acute &&
     sib.age >= 23 &&
     sib.age <= 38 &&
-    !siblingMate(s,sib) &&
+    !siblingUnionContact(s,sib) &&
     sib.money >= 3 &&
     random(s.seed, 'sibUnion' + s.year) < 0.08 + 0.05 * sib.ambition
   ) {
@@ -335,14 +335,15 @@ export function developFamily(s: Game) {
         (sib.house === 'sibling' ? '另立了门户。' : '留在原户生活。'),
     )
   }
-  const mate = siblingMate(s,sib)
+  const spouseId = sib && partnerOf(s,sib.id)
+  const mate = spouseId ? residents(s).find(n => n.id === spouseId) : undefined
   if (
     sib?.alive &&
     mate?.alive &&
     !sib.acute &&
     !mate.acute &&
     sib.age < 40 &&
-    !roster.some(n => parentsOf(s,n.id).includes(sib.id) && parentsOf(s,n.id).includes(mate.id)) &&
+    !roster.some(n => parentsOf(s,n.id).includes(sib.id)) &&
     random(s.seed, 'sibChild' + s.year) < 0.12
   ) {
     const child = kin(kinContext(s), '手足的孩子', 0, 'niece')

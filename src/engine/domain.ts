@@ -74,10 +74,12 @@ export function birthSibling(s: Game) {
   const parents = s.parentIds[s.playerId]
   return residents(s).find(n => s.parentIds[n.id].some(id => parents.includes(id)))
 }
-export function siblingMate(s: Game, sibling: Person | undefined) {
+/** Most recent union contact, including a surviving spouse after widowhood. */
+export function siblingUnionContact(s: Game, sibling: Person | undefined) {
   if (!canonical(s)) return s.npcs.find(n => n.id === 'sibPartner')
   if (!sibling) return undefined
-  const union = s.marriages.find(u => u.pair.includes(sibling.id))
+  const unions = s.marriages.filter(u => u.pair.includes(sibling.id))
+  const union = unions.find(u => !u.end) ?? unions.at(-1)
   const id = union?.pair.find(id => id !== sibling.id)
   return id ? relative(s,id) : undefined
 }

@@ -1,4 +1,4 @@
-import { canonical, inLawParents, birthSibling, parentsOf, partnerOf, player, playerId, residents, siblingMate, type Game } from '../../engine/domain.ts'
+import { canonical, inLawParents, birthSibling, parentsOf, partnerOf, player, playerId, residents, siblingUnionContact, type Game } from '../../engine/domain.ts'
 
 export function authority(s: Game, house: string) {
   const p = player(s), pid = playerId(s)
@@ -19,7 +19,7 @@ export function authority(s: Game, house: string) {
     return pid
   const sibling = birthSibling(s)
   const successors = house === 'birth' || house === 'sibling'
-    ? [sibling?.id, siblingMate(s,sibling)?.id]
+    ? [sibling?.id, siblingUnionContact(s,sibling)?.id]
     : [...elders,partnerOf(s,pid)]
   return capable(successors) ?? adults.find(n => canonical(s)
     ? parentsOf(s,n.id).some(id => id === pid || id === sibling?.id)
