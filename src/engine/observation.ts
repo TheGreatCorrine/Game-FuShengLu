@@ -1,4 +1,5 @@
-import { date, eligible, narrative } from '../engine.ts'
+import { date } from '../content/western-han/date.ts'
+import { eligible, narrative } from '../content/western-han/events.ts'
 import { history, homes, regions, rules } from '../data.ts'
 import type { Action } from '../data.ts'
 import { marriageSummary, protagonist } from './people.ts'

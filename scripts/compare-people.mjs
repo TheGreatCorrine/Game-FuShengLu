@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import * as current from '../src/engine/life.ts'
 import { eligible } from '../src/engine.ts'
+import { observePlayer } from '../src/engine/observation.ts'
 import { legacyView } from './legacy-household-view.mjs'
 
 const old = await import(pathToFileURL(resolve(process.argv[2])).href)
@@ -43,6 +44,7 @@ for (let i=0;i<Number(process.argv[4]??600);i++) {
     }
     try {
       if (canonical) check(oldState,b,'canonical')
+      if (canonical && old.observePlayer) check(old.observePlayer(oldState),observePlayer(b),'observation')
       current.validatePeople(b)
       if(previous) for(const [id,key] of Object.entries(previous.legacyKeys)) check(key,b.legacyKeys[id],'stable.'+id)
       check(a.households,b.households,'accounts')
@@ -62,7 +64,7 @@ for (let i=0;i<Number(process.argv[4]??600);i++) {
       oldState=old.confirmName(oldState,'宁');b=current.confirmName(b,'宁')
     } else if(a.pending) {
       const options=old.eligible(a).find(e=>e.id===a.pending).choices
-      check(options,eligible(view).find(e=>e.id===view.pending)?.choices,'choices')
+      check(options,eligible(b).find(e=>e.id===view.pending)?.choices,'choices')
       const actions=options.map(c=>c[1])
       const action=policy==='random'?actions[Math.floor(old.random(seed,'policy'+a.age)*actions.length)]
         :priorities[policy].find(x=>actions.includes(x))??actions[0]

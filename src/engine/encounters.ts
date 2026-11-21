@@ -1,11 +1,11 @@
-import { player, playerId, residents, type Game } from './domain.ts'
+import { player, playerId, residents, type Game, type Person } from './domain.ts'
 import { payHouseDebt, changeOccupation } from './operations.ts'
 import { account, openHouse } from './accounts.ts'
-import type { State, Kin } from './types.ts'
 import { remember, helpChance } from './family.ts'
 import type { Action } from '../data.ts'
 export { participant, allowed, candidate, narrative } from '../content/western-han/events.ts'
-export function negotiate(s: State, n: Kin, id: string, a: Action, r: number) {
+export function negotiate(s: Game, n: Person, id: string, a: Action, r: number) {
+  const p = player(s)
   const yes = r < helpChance(s, n)
   switch (a) {
     case 'halfDays':
@@ -14,16 +14,16 @@ export function negotiate(s: State, n: Kin, id: string, a: Action, r: number) {
         return n.name + '指着未完的活：“少了半日也赶不及。这次等一等。”'
       }
       account(s).cash -= 2
-      s.skill++
-      s.practice++
-      s.training = '半日习读'
+      p.skill++
+      p.practice++
+      p.training = '半日习读'
       if (!s.queue.some((q) => q.cause === 'turn'))
         s.queue.push({ age: 18, cause: 'turn' })
       remember(s, n, 'halfDays', 0.06)
       return n.name + '答应只请半日的课。你天亮先做活，午后再去认字。'
     case 'split': {
       const own = Math.min(4, n.money)
-      s.purse -= 4
+      p.purse -= 4
       n.money -= own
       openHouse(s, 'sibling', { cash: 4 + own, debt: 0, assets: 0 })
       n.house = 'sibling'
@@ -40,12 +40,12 @@ export function negotiate(s: State, n: Kin, id: string, a: Action, r: number) {
       remember(s, n, 'dispute', -0.04)
       return n.name + '谢过你，说还是想自己谋出路。'
     case 'stake':
-      s.purse -= 3
+      p.purse -= 3
       changeOccupation(n, '织作')
       remember(s, n, 'aid', 0.1)
       return n.name + '用你出的三钱置线，接下第一匹布。'
     case 'trial':
-      s.practice++
+      p.practice++
       if (n.ambition + r > 0.8) {
         changeOccupation(n, '织作')
         remember(s, n, 'trial', 0.06)
@@ -60,7 +60,7 @@ export function negotiate(s: State, n: Kin, id: string, a: Action, r: number) {
       }
       return n.name + '收起了线样，暂且继续原来的生计。'
     case 'medicineFee':
-      s.purse -= 5
+      p.purse -= 5
       n.health = Math.min(100, n.health + (yes ? 12 : 4))
       remember(s, n, 'care', 0.1)
       return (

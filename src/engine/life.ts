@@ -1,9 +1,8 @@
 import { confirmedName } from './operations.ts'
 import { runYear } from './scheduler.ts'
-import * as legacy from '../engine.ts'
-import { collectPeople, legacyPeopleView, protagonist } from './people.ts'
+import { resolveChoice } from './choices.ts'
+import { protagonist } from './people.ts'
 import type { Life } from './people.ts'
-import type { Kin } from './types.ts'
 import type { Action } from '../data.ts'
 
 export { legacyPeopleView, migratePeople, validatePeople } from './people.ts'
@@ -22,7 +21,9 @@ export function advance(s: Life) {
   return draft
 }
 export function decide(s: Life, action: Action) {
-  return collectPeople(legacy.decide(legacyPeopleView(s),action),s)
+  const draft = structuredClone(s)
+  resolveChoice(draft,action)
+  return draft
 }
 export function skip(s: Life) {
   while (protagonist(s).name && !protagonist(s).dead && !s.pending) s=advance(s)

@@ -28,9 +28,11 @@ export function register(s: Game, template: Kin, parents: string[], external = f
     return template
   }
   const {id:key, trust, closeness, conflict, history, partner, parents:unused, ...facts} = template
-  const id = 'p' + s.nextPerson++
+  const id = 'p' + s.nextPerson
   if (Object.hasOwn(s.people,id) || Object.values(s.legacyKeys).includes(key))
     throw Error('Duplicate person: '+key)
+  if (parents.some(id => !s.people[id])) throw Error('Unknown parent of '+key)
+  s.nextPerson++
   const n: Relative = {...facts, id, kind:'relative', house: external ? null : facts.house}
   s.people[id] = n
   s.parentIds[id] = parents

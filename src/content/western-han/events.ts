@@ -10,51 +10,52 @@ import { homes, rules, scenes } from './catalog.ts'
 
 const living = (s: Game) => residents(s).filter(n => n.alive)
 export function eligible(s: Game) {
+  const p = player(s)
   return scenes
     .filter(
       (e) =>
         (e.id !== 'studyConflict' ||
-          (player(s).training === '习读' &&
+          (p.training === '习读' &&
             account(s).debt > 0 &&
             participant(s, 'turn')?.goal === '积谷' &&
             parentsOf(s,playerId(s)).includes(participant(s, 'turn')!.id))) &&
         (e.id !== 'medicine' || !!participant(s, 'medicine')) &&
-        (e.id !== 'personalLoan' || player(s).purse < 16 || account(s).debt > 0) &&
+        (e.id !== 'personalLoan' || p.purse < 16 || account(s).debt > 0) &&
         (e.id !== 'collect' ||
-          (player(s).age >= s.nextCollection &&
+          (p.age >= s.nextCollection &&
             s.loans.some(
               (l) => l.debtor === playerId(s) && l.balance > 0 && l.due <= s.year,
             ))) &&
         (e.id !== 'demand' ||
-          (player(s).residence !== 'birth' && (s.households.birth?.debt ?? 0) > 0)) &&
-        player(s).name &&
-        !player(s).dead &&
-        player(s).age >= e.min &&
-        player(s).age <= e.max &&
+          (p.residence !== 'birth' && (s.households.birth?.debt ?? 0) > 0)) &&
+        p.name &&
+        !p.dead &&
+        p.age >= e.min &&
+        p.age <= e.max &&
         (!s.seen.includes(e.id) || e.id === 'wedding' || e.id === 'collect') &&
         (e.id !== 'relief' ||
           (account(s).debt >= 8 &&
             living(s).some(
-              (n) => n.house === player(s).residence && n.age >= 16 && n.money > 0,
+              (n) => n.house === p.residence && n.age >= 16 && n.money > 0,
             ))) &&
         (e.id !== 'letterHome' ||
-          (player(s).residence !== 'birth' &&
+          (p.residence !== 'birth' &&
             (s.households.birth?.debt ?? 0) >= 8 &&
-            player(s).purse >= 1 &&
+            p.purse >= 1 &&
             living(s).some((n) => n.house === 'birth'))) &&
-        (e.id !== 'wedding' || player(s).age >= s.wedding.next) &&
+        (e.id !== 'wedding' || p.age >= s.wedding.next) &&
         (!e.gate ||
           {
-            books: homes[player(s).home].books > 0,
-            kin: living(s).some((n) => n.house === player(s).residence),
-            trained: player(s).training === '学成',
+            books: homes[p.home].books > 0,
+            kin: living(s).some((n) => n.house === p.residence),
+            trained: p.training === '学成',
             single:
-              player(s).age >= rules.marriageAge &&
+              p.age >= rules.marriageAge &&
               !partnerOf(s,playerId(s)) &&
               ((canonical(s) ? marriageSummary(s) : s.marriage) === 'widowed'
-                ? player(s).age <= rules.family.widowAgeLimit
-                : player(s).age <= 34),
-            trade: player(s).home === 2,
+                ? p.age <= rules.family.widowAgeLimit
+                : p.age <= 34),
+            trade: p.home === 2,
           }[e.gate]),
     )
     .map((e) => ({

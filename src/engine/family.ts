@@ -21,7 +21,7 @@ export function kin(s: Pick<State,'seed'|'sex'|'year'|'residence'|'home'|'surnam
             : roll('sex') < 0.5
               ? '女'
               : '男',
-    parents: role === '手足' ? ['father', 'mother'] : [],
+    parents: [],
     partner: null,
     born: s.year - age,
     acute: '',
@@ -104,6 +104,8 @@ export function joinFamily(s: Game, p: Person) {
   const self = player(s), pid = playerId(s)
   if (self.dead || !p.alive || partnerOf(s,p.id) || partnerOf(s,pid) || p.id === pid || residents(s).some(n => n.id === p.id))
     throw Error('Invalid household marriage admission: ' + p.id)
+  if (canonical(s) && (s.candidateId !== p.id || s.people[p.id] !== p))
+    throw Error('Unregistered marriage candidate')
   const serial = unionCount(s) + 1,
     origin = 'kin' + serial
   const allocation = { cash: Math.floor(homes[p.background].coins / 2), assets: 1, debt: 0 }
@@ -141,7 +143,6 @@ export function joinFamily(s: Game, p: Person) {
   }
   p.house = self.residence
   if (canonical(s)) {
-    if (s.candidateId !== p.id) throw Error('Unregistered marriage candidate')
     s.residentOrder.push(p.id)
     s.candidateId = null
   } else if ('parents' in p) {
