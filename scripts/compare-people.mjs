@@ -1,4 +1,4 @@
-// Usage: node compare.mjs /path/to/stage1.mjs POLICY [seedCount]
+// Usage: node compare.mjs /path/to/oracle.mjs POLICY [seedCount] [seedPrefix]
 import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
@@ -26,7 +26,7 @@ function difference(a,b,path=[]) {
   return {path,old:a,new:b}
 }
 for (let i=0;i<Number(process.argv[4]??600);i++) {
-  const seed='quality'+i
+  const seed=(process.argv[5] ?? 'quality')+i
   let oldState=old.generate(seed), b=current.generate(seed), previous, command='generate'
   const canonical = 'people' in oldState
   while(true) {
