@@ -98,7 +98,8 @@ settle(s, 'father')
 examples.C = { fixture: true, settlement: s.settlements[0] }
 for (let i = 0; i < 100 && !examples.D; i++) {
   const s = born('credit-parent' + i)
-  Object.assign(s, { age: 20, pending: 'relief', debt: 10, cash: 0 })
+  Object.assign(s, { age: 20, pending: 'relief' })
+  Object.assign(s.households.birth, { debt: 10, cash: 0 })
   s.npcs[0].money = 12
   const a = structuredClone(s),
     b = structuredClone(s)

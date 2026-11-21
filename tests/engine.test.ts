@@ -54,10 +54,10 @@ describe('Western Han slice', () => {
       false,
     )
     expect(
-      support({ ...s, cash: 80 }, { ...n, goal: '授业', generosity: 1 }),
+      support({ ...s, households: { birth: { ...s.households.birth, cash: 80 } } }, { ...n, goal: '授业', generosity: 1 }),
     ).toBeGreaterThan(
       support(
-        { ...s, cash: 1, debt: 20 },
+        { ...s, households: { birth: { ...s.households.birth, cash: 1, debt: 20 } } },
         { ...n, goal: '积谷', generosity: 0 },
       ),
     )
@@ -70,15 +70,15 @@ describe('Western Han slice', () => {
         age: 15,
         year: generate(String(i)).birth + 15,
         pending: 'turn',
-        cash: 80,
         home: 3,
       }
+      s.households.birth.cash = 80
       const generous = structuredClone(s),
         frugal = structuredClone(s)
       Object.assign(generous.npcs[0], { goal: '授业', generosity: 1 })
       Object.assign(frugal.npcs[0], { goal: '积谷', generosity: 0 })
-      frugal.cash = 8
-      frugal.debt = 5
+      frugal.households[frugal.residence].cash = 8
+      frugal.households[frugal.residence].debt = 5
       let a = decide(generous, 'learn')
       const b = decide(frugal, 'learn')
       if (a.training !== '习读' || b.training === '习读') continue
@@ -104,7 +104,7 @@ describe('Western Han slice', () => {
   it('keeps personal earnings separate from household assets', () => {
     const s = { ...born(), age: 15, pending: 'turn' },
       next = decide(s, 'work')
-    expect(next.cash).toBe(s.cash)
+    expect(next.cash).toBe(s.households.birth.cash)
     expect(next.purse).toBeGreaterThanOrEqual(s.purse)
   })
   it('leaves deceased relatives frozen', () => {

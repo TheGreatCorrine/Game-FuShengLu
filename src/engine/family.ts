@@ -1,10 +1,12 @@
+import { canonical, attitude, unionCount, currentCandidate, type Person, birthSibling, siblingUnionContact, parentsOf, keyFor, register, formUnion, kinContext, player, playerId, residents, partnerOf, endUnion, type Game } from './domain.ts'
+import { payHouseDebt, changeOccupation, transferSavings } from './operations.ts'
 import { authority, settle, borrow, outstanding, repay } from './legal.ts'
 import type { State, Kin } from './types.ts'
 import { homes, rules } from '../data.ts'
 import { random } from './rng.ts'
 import { annualHealth } from './mortality.ts'
-import { account } from './economy.ts'
-export function kin(s: State, role: string, age: number, id: string): Kin {
+import { account, openHouse, moveResidence } from './accounts.ts'
+export function kin(s: Pick<State,'seed'|'sex'|'year'|'residence'|'home'|'surname'>, role: string, age: number, id: string): Kin {
   const roll = (k: string) => random(s.seed, id + k)
   return {
     sex:
@@ -19,7 +21,7 @@ export function kin(s: State, role: string, age: number, id: string): Kin {
             : roll('sex') < 0.5
               ? '女'
               : '男',
-    parents: role === '手足' ? ['father', 'mother'] : [],
+    parents: [],
     partner: null,
     born: s.year - age,
     acute: '',
@@ -49,30 +51,34 @@ export function kin(s: State, role: string, age: number, id: string): Kin {
     memories: [],
   }
 }
-const note = (s: State, text: string) =>
-  s.chronicle.push({ age: s.age, year: s.year, text })
+const note = (s: Game, text: string) =>
+  s.chronicle.push({ age: player(s).age, year: s.year, text })
 const clamp = (v: number) => Math.min(1, Math.max(0, v))
-export function remember(s: State, n: Kin, id: string, trust: number) {
-  n.trust = clamp(n.trust + trust)
-  n.conflict = clamp(n.conflict - trust)
-  n.history.push({
+export function remember(s: Game, n: Person, id: string, trust: number) {
+  if (!n.alive || (!residents(s).includes(n) && currentCandidate(s) !== n) || !id || !Number.isFinite(trust))
+    throw Error('Invalid relationship update: ' + n.id)
+  const feelings = attitude(s,n)
+  feelings.trust = clamp(feelings.trust + trust)
+  feelings.conflict = clamp(feelings.conflict - trust)
+  feelings.history.push({
     id,
     year: s.year,
-    actors: ['player', n.id],
+    actors: [playerId(s), n.id],
     trust,
     significance: Math.abs(trust),
   })
-  if (n.history.length > 8)
-    n.history.splice(
-      n.history.findIndex(
+  if (feelings.history.length > 8)
+    feelings.history.splice(
+      feelings.history.findIndex(
         (m) =>
-          m.significance === Math.min(...n.history.map((m) => m.significance)),
+          m.significance === Math.min(...feelings.history.map((m) => m.significance)),
       ),
       1,
     )
 }
-export function helpChance(s: State, n: Kin) {
-  const memory = n.history.reduce(
+export function helpChance(s: Game, n: Person) {
+  const feelings = attitude(s,n)
+  const memory = feelings.history.reduce(
     (v, m) =>
       v +
       (m.id === 'care' || m.id === 'aid'
@@ -85,28 +91,29 @@ export function helpChance(s: State, n: Kin) {
   return clamp(
     0.12 +
       0.24 * n.generosity +
-      0.2 * n.trust +
-      0.1 * n.closeness +
+      0.2 * feelings.trust +
+      0.1 * feelings.closeness +
       0.12 * Number(n.goal === '积谷') +
       0.08 * Number(n.money > 10) -
-      0.1 * n.conflict -
+      0.1 * feelings.conflict -
       0.12 * Number(n.acute !== '') +
       memory,
   )
 }
-export function joinFamily(s: State, p: Kin) {
-  const serial = ++s.unions,
+export function joinFamily(s: Game, p: Person) {
+  const self = player(s), pid = playerId(s)
+  if (self.dead || !p.alive || partnerOf(s,p.id) || partnerOf(s,pid) || p.id === pid || residents(s).some(n => n.id === p.id))
+    throw Error('Invalid household marriage admission: ' + p.id)
+  if (canonical(s) && (s.candidateId !== p.id || s.people[p.id] !== p))
+    throw Error('Unregistered marriage candidate')
+  const serial = unionCount(s) + 1,
     origin = 'kin' + serial
-  s.estates[origin] = {
-    cash: Math.floor(homes[p.background].coins / 2),
-    assets: 1,
-    debt: 0,
-  }
+  const allocation = { cash: Math.floor(homes[p.background].coins / 2), assets: 1, debt: 0 }
   const r = (k: string) => random(s.seed, origin + k)
   for (const [i, chance] of [0.78, 0.46].entries()) {
     if (r('relative' + i) > chance) continue
     const elder = kin(
-      s,
+      kinContext(s),
       i ? '姻亲长辈（母）' : '姻亲长辈（父）',
       p.age + 20 + Math.floor(r('age' + i) * 15),
       origin + 'elder' + i,
@@ -118,88 +125,101 @@ export function joinFamily(s: State, p: Kin) {
     elder.background = p.background
     elder.work = homes[p.background].work
     if (elder.age >= 60) elder.work = '家中休养'
-    p.parents.push(elder.id)
-    s.npcs.push(elder)
+    const parent = register(s,elder,[])
+    if (canonical(s)) s.parentIds[p.id].push(parent.id)
+    else if ('parents' in p) p.parents.push(parent.id)
   }
   // A later spouse joins the established household, keeping children resident.
-  if (serial === 1 && r('move') < (s.cash < 30 ? 0.75 : 0.48)) {
-    s.estates.birth = { cash: s.cash, assets: s.assets, debt: s.debt }
-    const elders = s.npcs.some((n) => n.house === origin)
-    s.residence = elders ? origin : 'independent'
-    Object.assign(s, s.estates[origin])
-    delete s.estates[origin]
+  const elders = residents(s).some(n => n.house === origin)
+  const moving = serial === 1 && r('move') < (account(s).cash < 30 ? 0.75 : 0.48)
+  if (elders || moving) {
+    const destination = elders ? origin : 'independent'
+    openHouse(s, destination, allocation)
+    if (moving) moveResidence(s, destination)
+  } else {
+    // An unrepresented spouse household contributes its original endowment once.
+    account(s).cash += allocation.cash
+    account(s).assets += allocation.assets
   }
-  // A spouse with no other represented relatives brings the allocated goods.
-  if (s.estates[origin] && !s.npcs.some((n) => n.house === origin)) {
-    s.cash += s.estates[origin].cash
-    s.assets += s.estates[origin].assets
-    delete s.estates[origin]
+  p.house = self.residence
+  if (canonical(s)) {
+    s.residentOrder.push(p.id)
+    s.candidateId = null
+  } else if ('parents' in p) {
+    s.npcs.push(p)
+    s.unions = serial
+    s.marriage = serial === 1 ? 'married' : 'remarried'
   }
-  p.house = s.residence
-  p.partner = 'player'
-  s.spouse = p.id
-  s.npcs.push(p)
-  for (const id of [origin, s.residence])
-    if (id === s.residence || s.estates[id]) s.heads[id] = authority(s, id)
-  s.marriage = serial === 1 ? 'married' : 'remarried'
+  formUnion(s,pid,p.id)
+  for (const id of [origin, self.residence])
+    if (id === self.residence || s.households[id]) s.heads[id] = authority(s, id)
   note(
     s,
     '与' +
       p.name +
       '成家，' +
-      (s.residence === 'birth'
+      (self.residence === 'birth'
         ? '留在原家同住。'
-        : s.residence === 'independent'
+        : self.residence === 'independent'
           ? '另起门户。'
           : '同姻亲合住。'),
   )
 }
-export function resolveKinHealth(s: State) {
+type HealthWorld = Pick<State,'seed'|'year'|'env'|'mortality'|'households'>
+type Resident = Pick<Kin,'id'|'age'|'alive'|'health'|'acute'> & { house: string | null }
+
+// Traversal order controls the subsequent death notices and estate settlements.
+export function ageResidents(world: HealthWorld, residents: Resident[], keyFor: (id:string) => string) {
   const deaths: string[] = []
-  for (const n of s.npcs.filter((n) => n.alive)) {
+  for (const n of residents) {
+    if (!n.alive) continue
+    const key = keyFor(n.id)
+    if (!key || n.house === null || !Object.hasOwn(world.households,n.house))
+      throw Error('Missing resident health context: ' + n.id)
     n.age++
-    const health = annualHealth(
-      n.age,
-      n.health,
-      random(s.seed, n.id + 'frailty'),
-      s.env.disease,
-      account(s, n.house).debt > 0,
-      (k) => random(s.seed, n.id + k + s.year),
-      s.mortality,
-    )
-    n.health = health.health
-    n.acute = health.acute
-    if (!health.dead) continue
-    n.alive = false
-    deaths.push(n.id)
-    note(s, n.role + ' ' + n.name + ' 离世。')
-    if (n.partner && n.partner !== 'player') {
-      const survivor = s.npcs.find((k) => k.id === n.partner)
-      if (survivor) survivor.partner = null
-      n.partner = null
+    const outcome = annualHealth(n.age, n.health, random(world.seed, key + 'frailty'),
+      world.env.disease, world.households[n.house].debt > 0,
+      k => random(world.seed, key + k + world.year), world.mortality)
+    n.health = outcome.health
+    n.acute = outcome.acute
+    if (outcome.dead) {
+      n.alive = false
+      deaths.push(n.id)
     }
-    if (n.id === s.spouse) {
-      n.partner = null
-      s.spouse = null
-      s.marriage = 'widowed'
+  }
+  return deaths
+}
+
+export function resolveKinHealth(s: State) {
+  finishResidentDeaths(s, ageResidents(s, s.npcs, id => id))
+}
+
+export function finishResidentDeaths(s: Game, deaths: string[]) {
+  const p = player(s), pid = playerId(s)
+  for (const id of deaths) {
+    const n = residents(s).find(person => person.id === id)
+    if (!n || n.alive) throw Error('Invalid resident death: ' + id)
+    note(s, n.role + ' ' + n.name + ' 离世。')
+    const spouse = partnerOf(s,id)
+    if (spouse) endUnion(s,id,'widowed')
+    if (spouse === pid) {
       s.wedding.state = 'deferred'
-      s.wedding.next = s.age + rules.family.remarryWait
+      s.wedding.next = p.age + rules.family.remarryWait
       note(s, '伴侣离世，留下的家人仍在原户生活。')
     }
   }
   for (const id of deaths) settle(s, id)
-  if (s.dead) settle(s, 'player')
-  if (s.dead && s.spouse) {
-    const p = s.npcs.find((n) => n.id === s.spouse)!
-    p.partner = null
-    s.spouse = null
-    s.marriage = 'ended'
+  if (p.dead) {
+    settle(s,pid)
+    if (partnerOf(s,pid)) endUnion(s,pid,'ended')
   }
 }
-export function developFamily(s: State) {
-  for (const n of s.npcs.filter((n) => n.alive)) {
-    const r = random(s.seed, n.id + 'year' + s.age),
-      book = account(s, n.house)
+export function developFamily(s: Game) {
+  const self = player(s)
+  const roster = residents(s)
+  for (const n of roster.filter((n) => n.alive)) {
+    const r = random(s.seed, keyFor(s,n.id) + 'year' + self.age),
+      book = account(s, n.house!)
     if (n.age >= 18 && n.age < 60 && !n.acute) {
       if (
         book.debt >= 8 &&
@@ -209,8 +229,7 @@ export function developFamily(s: State) {
         !outstanding(s, n.id) &&
         borrow(s, n.id)
       ) {
-        n.money -= 8
-        book.debt -= 8
+        payHouseDebt(n, book, 8)
         note(s, n.name + '以自己的名义借了八钱，替家中还欠。')
       } else if (n.money > 4 && outstanding(s, n.id)) {
         n.money -= repay(s, n.id, n.money - 4)
@@ -238,16 +257,16 @@ export function developFamily(s: State) {
       n.work !== '织作' &&
       r < 0.1 + 0.18 * n.ambition + 0.12 * Number(n.goal === '积谷')
     ) {
-      n.work = '织作'
+      changeOccupation(n, '织作')
       n.position = ''
       note(
         s,
-        (n.house === s.residence ? '' : '旧家传来消息，') +
+        (n.house === self.residence ? '' : '旧家传来消息，') +
           n.name +
           ' 接了织作，想替家里还债。',
       )
     } else if (n.goal === '授业' && r < 0.22) {
-      const pupil = s.npcs.find(
+      const pupil = roster.find(
         (c) =>
           c.alive &&
           c.house === n.house &&
@@ -257,7 +276,7 @@ export function developFamily(s: State) {
       )
       if (
         pupil &&
-        (homes[n.background].books || (s.skill >= 3 && n.house === s.residence))
+        (homes[n.background].books || (self.skill >= 3 && n.house === self.residence))
       ) {
         pupil.memories.push('随家人习字')
         pupil.goal = '授业'
@@ -268,8 +287,7 @@ export function developFamily(s: State) {
         note(s, n.name + ' 腾出工夫教' + pupil.name + ' 辨认木简。')
       }
     } else if (n.goal === '积谷' && r < 0.18 && book.cash >= 2) {
-      book.cash -= 2
-      n.money += 2
+      transferSavings(book, n, 2)
       if (
         n.money >= 20 &&
         book.debt === 0 &&
@@ -282,33 +300,32 @@ export function developFamily(s: State) {
       }
     }
   }
-  const sib = s.npcs.find((n) => n.id === 'sibling' && n.alive)
+  const sib = birthSibling(s)
   if (
-    sib &&
+    sib?.alive &&
     !sib.acute &&
     sib.age >= 23 &&
     sib.age <= 38 &&
-    !s.npcs.some((n) => n.id === 'sibPartner') &&
+    !siblingUnionContact(s,sib) &&
     sib.money >= 3 &&
     random(s.seed, 'sibUnion' + s.year) < 0.08 + 0.05 * sib.ambition
   ) {
-    const mate = kin(s, '手足的伴侣', sib.age + 1, 'sibPartner')
+    const mate = kin(kinContext(s), '手足的伴侣', sib.age + 1, 'sibPartner')
     mate.sex = sib.sex === '男' ? '女' : '男'
-    mate.house = sib.house
+    mate.house = sib.house!
     mate.tier = 2
-    mate.partner = sib.id
-    sib.partner = mate.id
     if (
-      !s.estates.sibling &&
+      !s.households.sibling &&
       sib.house !== 'sibling' &&
       sib.money >= 9 &&
       sib.ambition > 0.6
     ) {
-      s.estates.sibling = { cash: 6, assets: 0, debt: 0 }
+      openHouse(s, 'sibling', { cash: 6, assets: 0, debt: 0 })
       sib.money -= 6
       sib.house = mate.house = 'sibling'
     }
-    s.npcs.push(mate)
+    const spouse = register(s,mate,[])
+    formUnion(s,sib.id,spouse.id)
     note(
       s,
       sib.name +
@@ -318,43 +335,42 @@ export function developFamily(s: State) {
         (sib.house === 'sibling' ? '另立了门户。' : '留在原户生活。'),
     )
   }
-  const mate = s.npcs.find((n) => n.id === 'sibPartner' && n.alive)
+  const spouseId = sib && partnerOf(s,sib.id)
+  const mate = spouseId ? residents(s).find(n => n.id === spouseId) : undefined
   if (
-    sib &&
-    mate &&
+    sib?.alive &&
+    mate?.alive &&
     !sib.acute &&
     !mate.acute &&
     sib.age < 40 &&
-    !s.npcs.some((n) => n.id === 'niece') &&
+    !roster.some(n => parentsOf(s,n.id).includes(sib.id)) &&
     random(s.seed, 'sibChild' + s.year) < 0.12
   ) {
-    const child = kin(s, '手足的孩子', 0, 'niece')
-    child.house = sib.house
-    child.parents = [sib.id, mate.id]
+    const child = kin(kinContext(s), '手足的孩子', 0, 'niece')
+    child.house = sib.house!
     child.tier = 2
-    s.npcs.push(child)
+    register(s,child,[sib.id,mate.id])
     note(s, sib.name + ' 家添了孩子。')
   }
-  const p = s.npcs.find((n) => n.id === s.spouse && n.alive)
+  const p = roster.find((n) => n.id === partnerOf(s,playerId(s)) && n.alive)
   if (
     !p ||
     p.acute ||
-    s.acute ||
-    Math.max(s.age, p.age) > rules.family.lastParentAge ||
-    Math.min(s.health, p.health) < 40 ||
+    self.acute ||
+    Math.max(self.age, p.age) > rules.family.lastParentAge ||
+    Math.min(self.health, p.health) < 40 ||
     (s.lastBirth !== null && s.year - s.lastBirth < rules.family.spacing)
   )
     return
   if (
-    random(s.seed, 'child' + s.age) >=
-    rules.family.chance * (s.debt > 0 ? 0.65 : 1)
+    random(s.seed, 'child' + self.age) >=
+    rules.family.chance * (account(s).debt > 0 ? 0.65 : 1)
   )
     return
   const id = 'child' + s.year
-  const child = kin(s, '孩子', 0, id)
-  child.parents = ['player', p.id]
+  const child = kin(kinContext(s), '孩子', 0, id)
   child.background = p.background
   s.lastBirth = s.year
-  s.npcs.push(child)
+  register(s,child,[playerId(s),p.id])
   note(s, '你与' + p.name + ' 的孩子' + child.name + '出生了。')
 }

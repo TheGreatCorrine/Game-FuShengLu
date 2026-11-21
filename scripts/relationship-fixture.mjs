@@ -10,9 +10,9 @@ export function memoryPair(seed) {
     later.age += 5
     later.year += 5
     for (const n of later.npcs) n.age = later.year - n.born
-    later.cash = 0
+    later.households[later.residence].cash = 0
     later.purse = 5
-    later.debt = 10
+    later.households[later.residence].debt = 10
     later.npcs[0].money = 12
     later.pending = 'relief'
     const end = decide(later, 'petition')

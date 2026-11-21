@@ -1,4 +1,8 @@
-import type { State, Kin } from './types.ts'
+import { attitude, player, playerId, keyFor, residents, type Game } from './domain.ts'
+import { account } from './accounts.ts'
+import { authority } from '../content/western-han/authority.ts'
+export { authority }
+import type { State } from './types.ts'
 import { rules } from '../data.ts'
 import { random } from './rng.ts'
 
@@ -27,75 +31,38 @@ export type LegalRuleset = {
   loanSize: number
   term: number
   needsAssent: (sex: string, dependent: boolean, lender: number) => boolean
-  eligible: (s: State, owner: string) => string[]
+  eligible: (s: Game, owner: string) => string[]
   recover: (assets: number, debt: number) => number
   divide: (amount: number, heirs: string[]) => number[]
 }
-export const outstanding = (s: State, id: string) =>
+export const outstanding = (s: Game, id: string) =>
   s.loans.filter((l) => l.debtor === id).reduce((a, l) => a + l.balance, 0)
-export function authority(s: State, house: string) {
-  const capable = (n: Kin) =>
-    n.alive && n.house === house && n.age >= 15 && n.health >= 35 && !n.acute
-  const adults = s.npcs.filter(capable)
-  if (house.startsWith('kin')) {
-    const head = [s.heads[house], house + 'elder0', house + 'elder1'].find(
-      (id) => adults.some((n) => n.id === id),
-    )
-    if (head) return head
-  }
-  if (house === 'birth') {
-    const parent = ['father', 'mother']
-      .map((id) => adults.find((n) => n.id === id))
-      .find(Boolean)
-    if (parent) return parent.id
-  }
-  if (
-    house === s.residence &&
-    !s.dead &&
-    s.age >= 16 &&
-    s.health >= 35 &&
-    !s.acute
-  )
-    return 'player'
-  // Named successors by household role, independent of age ranking.
-  const successors =
-    house === 'birth'
-      ? ['sibling', 'sibPartner']
-      : house === 'sibling'
-        ? ['sibling', 'sibPartner']
-        : [house + 'elder0', house + 'elder1', s.spouse]
-  return (
-    successors.find((id) => adults.some((n) => n.id === id)) ??
-    adults.find((n) => n.role === '孩子' || n.role === '手足的孩子')?.id ??
-    null
-  )
-}
-export function spendable(s: State) {
+export function spendable(s: Game) {
   return Math.max(
     0,
-    s.purse - Math.min(rules.legalRules.reserve, outstanding(s, 'player')),
+    player(s).purse - Math.min(rules.legalRules.reserve, outstanding(s, playerId(s))),
   )
 }
-export function credit(s: State, person = 'player') {
-  const n = s.npcs.find((k) => k.id === person),
-    house = n?.house ?? s.residence,
-    age = n?.age ?? s.age
-  const book = house === s.residence ? s : s.estates[house]
+export function credit(s: Game, person = playerId(s)) {
+  const n = residents(s).find((k) => k.id === person),
+    house = n?.house ?? player(s).residence,
+    age = n?.age ?? player(s).age
+  const book = account(s, house)
   const head = authority(s, house),
-    sponsor = s.npcs.find((k) => k.id === head)
+    sponsor = residents(s).find((k) => k.id === head)
   const backing =
-    !!sponsor && sponsor.trust + sponsor.generosity > 1 && book.assets > 0
+    !!sponsor && attitude(s,sponsor).trust + sponsor.generosity > 1 && book.assets > 0
   const security =
-    (person === 'player' ? s.purse : (n?.money ?? 0)) +
+    (person === playerId(s) ? player(s).purse : (n?.money ?? 0)) +
     (head === person ? book.assets * 4 : 0)
-  if (age < 15 || s.dead || (n && !n.alive)) return '借主眼下不能亲自立约。'
+  if (age < 15 || player(s).dead || (n && !n.alive)) return '借主眼下不能亲自立约。'
   if (outstanding(s, person) >= rules.legalRules.loanSize)
     return '旧借未清，出借人不愿再垫。'
   if (security < 3 && !backing) return '手中没有足够私蓄，也无人愿意作保。'
   const disposition = random(s.seed, 'lender' + house)
   if (
     rules.legalRules.needsAssent(
-      n?.sex ?? s.sex,
+      n?.sex ?? player(s).sex,
       head !== person && security < 6,
       disposition,
     ) &&
@@ -107,7 +74,7 @@ export function credit(s: State, person = 'player') {
   return ''
 }
 export function borrow(
-  s: State,
+  s: Game,
   id: string,
   amount = rules.legalRules.loanSize,
 ) {
@@ -118,8 +85,8 @@ export function borrow(
     credit(s, id)
   )
     return false
-  const person = s.npcs.find((n) => n.id === id)
-  if (id !== 'player' && !person) return false
+  const person = residents(s).find((n) => n.id === id)
+  if (id !== playerId(s) && !person) return false
   s.loans.push({
     id: 'loan' + s.loans.length,
     debtor: id,
@@ -131,10 +98,10 @@ export function borrow(
     writtenOff: 0,
   })
   if (person) person.money += amount
-  else s.purse += amount
+  else player(s).purse += amount
   return true
 }
-export function repay(s: State, id: string, available: number) {
+export function repay(s: Game, id: string, available: number) {
   if (!Number.isSafeInteger(available) || available < 0)
     throw Error('Invalid payment')
   let left = available
@@ -146,39 +113,53 @@ export function repay(s: State, id: string, available: number) {
   return available - left
 }
 export function settle(
-  s: State,
+  s: Game,
   id: string,
   rule: LegalRuleset = rules.legalRules,
 ) {
   if (s.settlements.some((e) => e.owner === id)) return
-  const n = s.npcs.find((k) => k.id === id)
-  if (id === 'player' ? !s.dead : !n || n.alive) return
-  const assets = n ? n.money : s.purse,
-    liabilities = outstanding(s, id),
-    paid = repay(s, id, rule.recover(assets, liabilities))
-  for (const l of s.loans.filter((l) => l.debtor === id)) {
+  const p = player(s), pid = playerId(s)
+  const n = residents(s).find((k) => k.id === id)
+  if (id === pid ? !p.dead : !n || n.alive) return
+  const assets = n ? n.money : p.purse
+  const liabilities = outstanding(s, id)
+  const paid = rule.recover(assets, liabilities)
+  const validAmount = (v: number) => Number.isSafeInteger(v) && v >= 0
+  if (![assets, liabilities, paid].every(validAmount) || paid > Math.min(assets, liabilities))
+    throw Error('Invalid estate recovery: ' + id)
+
+  // Eligibility belongs to the dynasty. Identity, conservation and ordering
+  // are engine contracts and are checked before applying any payment.
+  const ids = rule.eligible(s, id).sort((a,b) => {
+    const x = keyFor(s,a), y = keyFor(s,b)
+    return x < y ? -1 : x > y ? 1 : 0
+  })
+  const heirs = ids.map(heir => heir === pid ? p : residents(s).find(k => k.id === heir))
+  if (new Set(ids).size !== ids.length || heirs.some(heir => !heir || ('dead' in heir ? heir.dead : !heir.alive)))
+    throw Error('Invalid estate recipients: ' + id)
+  const book = ids.length ? null : account(s, n?.house ?? p.residence)
+  const gross = rule.divide(assets, ids), charges = rule.divide(paid, ids)
+  if (gross.length !== ids.length || charges.length !== ids.length ||
+      (ids.length && (gross.reduce((a,b)=>a+b,0) !== assets || charges.reduce((a,b)=>a+b,0) !== paid)))
+    throw Error('Invalid estate division: ' + id)
+  const shares = ids.map((heir, i) => {
+    if (!validAmount(gross[i]) || !validAmount(charges[i]) || charges[i] > gross[i])
+      throw Error('Invalid estate share: ' + heir)
+    return {id: heir, gross: gross[i], charge: charges[i], net: gross[i] - charges[i]}
+  })
+  repay(s, id, paid)
+  for (const l of s.loans.filter(l => l.debtor === id)) {
     l.writtenOff += l.balance
     l.balance = 0
   }
-  const ids = rule.eligible(s, id).sort()
-  const gross = rule.divide(assets, ids),
-    charges = rule.divide(paid, ids)
-  const shares = ids.map((heir, i) => ({
-    id: heir,
-    gross: gross[i],
-    charge: charges[i],
-    net: gross[i] - charges[i],
-  }))
   if (n) n.money = 0
-  else s.purse = 0
-  for (const share of shares) {
-    if (share.id === 'player') s.purse += share.net
-    else s.npcs.find((k) => k.id === share.id)!.money += share.net
+  else p.purse = 0
+  for (const [i, share] of shares.entries()) {
+    const heir = heirs[i]!
+    if ('purse' in heir) heir.purse += share.net
+    else heir.money += share.net
   }
-  if (!shares.length) {
-    const house = n?.house ?? s.residence
-    ;(house === s.residence ? s : s.estates[house]).cash += assets - paid
-  }
+  if (book) book.cash += assets - paid
   s.settlements.push({
     owner: id,
     rule: rule.id,
@@ -190,9 +171,9 @@ export function settle(
   })
   if (assets || liabilities)
     s.chronicle.push({
-      age: s.age,
+      age: p.age,
       text:
-        (n?.name ?? s.name) +
+        (n?.name ?? p.name) +
         '的私财已清点。先偿契债' +
         paid +
         '钱，余下' +
