@@ -1,6 +1,6 @@
 # 浮生录 · 西汉试玩版
 
-解压后用现代浏览器打开 **PLAY.html** 即可离线游玩。取名后可逐年推进，也可快进到下一次抉择。人物志收录亲属近况，终章揭示当年影响本户的史实。刷新或另起一生会清除本局。
+拿到已构建的试玩包后，用现代浏览器打开 **PLAY.html** 即可离线游玩。从 GitHub 下载的源码需要先运行下方的安装和构建命令。取名后可逐年推进，也可快进到下一次抉择。人物志收录亲属近况，终章揭示当年影响本户的史实。刷新或另起一生会清除本局。
 
 开发环境建议 Node.js 22、npm。进入本目录后执行：
 
@@ -37,3 +37,7 @@ Node 22.18+ 或 24 可直接执行 node scripts/cohort.mjs 和 node scripts/pair
 ## Phase 2A · 家人的打算
 
 打开 PLAY.html 游玩。开发模式下输入 character29，第一次议亲先选「先同对方商量婚后用度」，其他抉择选当时可用的首项。到30岁可看到配偶周成提出改做织活。node scripts/character-runs.mjs 重放四组验收场景和256局诊断；见 docs/character-runs.json、docs/EVENT_DESIGN_GUIDELINES.md。
+
+## Phase 2A.2 · 架构与验收
+
+游戏命令入口为 `src/engine/life.ts`，玩家界面读取 `observePlayer`。旧存档与外部客户端的兼容入口见 [Stage 4.5 报告](docs/architecture/11_STAGE_4_5_REPORT.md)。本项目在本地执行验收。种子、试玩步骤、复现方式与合并建议见 [Stage 5 报告](docs/architecture/12_STAGE_5_REPORT.md)。
