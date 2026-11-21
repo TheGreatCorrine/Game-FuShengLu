@@ -1,14 +1,13 @@
 import { date, eligible, narrative } from '../engine.ts'
 import { history, homes, regions, rules } from '../data.ts'
 import type { Action } from '../data.ts'
-import { legacyPeopleView, marriageSummary, protagonist } from './people.ts'
+import { marriageSummary, protagonist } from './people.ts'
 import type { Life } from './people.ts'
 
 const publicRows = (rows: Life['news']) => rows.map(({age, text}) => ({age, text}))
 
-function pendingScene(life: Life) {
-  if (!life.pending) return null
-  const s = legacyPeopleView(life)
+function pendingScene(s: Life) {
+  if (!s.pending) return null
   const event = eligible(s).find(e => e.id === s.pending)
   if (!event) return null
   return {

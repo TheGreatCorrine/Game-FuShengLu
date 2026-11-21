@@ -1,4 +1,5 @@
-import { canonical, currentCandidate, player, kinContext, register, unionCount, type Game, type Person } from '../../engine/domain.ts'
+import { marriageSummary } from '../../engine/people.ts'
+import { attitude, birthSibling, parentsOf, partnerOf, playerId, residents, keyFor, canonical, currentCandidate, player, kinContext, register, unionCount, type Game, type Person } from '../../engine/domain.ts'
 import { account } from '../../engine/accounts.ts'
 import { kin } from '../../engine/family.ts'
 import { authority, spendable } from '../../engine/legal.ts'
@@ -7,53 +8,53 @@ import type { Action } from './catalog.ts'
 import type { Kin, State } from '../../engine/types.ts'
 import { homes, rules, scenes } from './catalog.ts'
 
-const living = (s: State) => s.npcs.filter(n => n.alive)
-export function eligible(s: State) {
+const living = (s: Game) => residents(s).filter(n => n.alive)
+export function eligible(s: Game) {
   return scenes
     .filter(
       (e) =>
         (e.id !== 'studyConflict' ||
-          (s.training === '习读' &&
+          (player(s).training === '习读' &&
             account(s).debt > 0 &&
             participant(s, 'turn')?.goal === '积谷' &&
-            ['father', 'mother'].includes(participant(s, 'turn')!.id))) &&
+            parentsOf(s,playerId(s)).includes(participant(s, 'turn')!.id))) &&
         (e.id !== 'medicine' || !!participant(s, 'medicine')) &&
-        (e.id !== 'personalLoan' || s.purse < 16 || account(s).debt > 0) &&
+        (e.id !== 'personalLoan' || player(s).purse < 16 || account(s).debt > 0) &&
         (e.id !== 'collect' ||
-          (s.age >= s.nextCollection &&
+          (player(s).age >= s.nextCollection &&
             s.loans.some(
-              (l) => l.debtor === 'player' && l.balance > 0 && l.due <= s.year,
+              (l) => l.debtor === playerId(s) && l.balance > 0 && l.due <= s.year,
             ))) &&
         (e.id !== 'demand' ||
-          (s.residence !== 'birth' && (s.households.birth?.debt ?? 0) > 0)) &&
-        s.name &&
-        !s.dead &&
-        s.age >= e.min &&
-        s.age <= e.max &&
+          (player(s).residence !== 'birth' && (s.households.birth?.debt ?? 0) > 0)) &&
+        player(s).name &&
+        !player(s).dead &&
+        player(s).age >= e.min &&
+        player(s).age <= e.max &&
         (!s.seen.includes(e.id) || e.id === 'wedding' || e.id === 'collect') &&
         (e.id !== 'relief' ||
           (account(s).debt >= 8 &&
             living(s).some(
-              (n) => n.house === s.residence && n.age >= 16 && n.money > 0,
+              (n) => n.house === player(s).residence && n.age >= 16 && n.money > 0,
             ))) &&
         (e.id !== 'letterHome' ||
-          (s.residence !== 'birth' &&
+          (player(s).residence !== 'birth' &&
             (s.households.birth?.debt ?? 0) >= 8 &&
-            s.purse >= 1 &&
+            player(s).purse >= 1 &&
             living(s).some((n) => n.house === 'birth'))) &&
-        (e.id !== 'wedding' || s.age >= s.wedding.next) &&
+        (e.id !== 'wedding' || player(s).age >= s.wedding.next) &&
         (!e.gate ||
           {
-            books: homes[s.home].books > 0,
-            kin: living(s).some((n) => n.house === s.residence),
-            trained: s.training === '学成',
+            books: homes[player(s).home].books > 0,
+            kin: living(s).some((n) => n.house === player(s).residence),
+            trained: player(s).training === '学成',
             single:
-              s.age >= rules.marriageAge &&
-              !s.spouse &&
-              (s.marriage === 'widowed'
-                ? s.age <= rules.family.widowAgeLimit
-                : s.age <= 34),
-            trade: s.home === 2,
+              player(s).age >= rules.marriageAge &&
+              !partnerOf(s,playerId(s)) &&
+              ((canonical(s) ? marriageSummary(s) : s.marriage) === 'widowed'
+                ? player(s).age <= rules.family.widowAgeLimit
+                : player(s).age <= 34),
+            trade: player(s).home === 2,
           }[e.gate]),
     )
     .map((e) => ({
@@ -89,17 +90,19 @@ export function bindCandidate(s: Game) {
   if (canonical(s)) s.candidateId = register(s,template,[],true).id
   else s.candidate = template
 }
-export function participant(s: State, id: string) {
-  const local = s.npcs.filter((n) => n.alive && n.house === s.residence)
+export function participant(s: State, id:string): Kin | undefined
+export function participant(s: Game, id:string): Person | undefined
+export function participant(s: Game, id: string) {
+  const local = residents(s).filter((n) => n.alive && n.house === player(s).residence)
   if (id === 'turn' || id === 'studyConflict' || id === 'letters')
-    return local.find((n) => n.id === authority(s, s.residence))
-  if (id === 'wedding') return candidate(s)
+    return local.find((n) => n.id === authority(s, player(s).residence))
+  if (id === 'wedding') return canonical(s) ? currentCandidate(s) ?? undefined : candidate(s)
   if (id === 'siblingPlan')
     return local.find(
       (n) =>
-        n.id === 'sibling' &&
+        n.id === birthSibling(s)?.id &&
         n.age >= 18 &&
-        !n.partner &&
+        !partnerOf(s,n.id) &&
         !n.acute &&
         n.house === 'birth' &&
         n.money >= 4 &&
@@ -108,7 +111,7 @@ export function participant(s: State, id: string) {
   if (id === 'spousePlan')
     return local.find(
       (n) =>
-        n.id === s.spouse &&
+        n.id === partnerOf(s,playerId(s)) &&
         !n.acute &&
         n.age < 60 &&
         n.work !== '织作' &&
@@ -119,23 +122,23 @@ export function participant(s: State, id: string) {
   if (id === 'medicine')
     return local
       .filter((n) => n.acute)
-      .sort((a, b) => a.health - b.health || a.id.localeCompare(b.id))[0]
+      .sort((a, b) => a.health - b.health || keyFor(s,a.id).localeCompare(keyFor(s,b.id)))[0]
   const people =
     id === 'letterHome'
-      ? s.npcs.filter((n) => n.alive && n.house === 'birth' && n.age >= 15)
+      ? residents(s).filter((n) => n.alive && n.house === 'birth' && n.age >= 15)
       : local
   const options =
     id === 'relief' ? people.filter((n) => n.age >= 16 && n.money > 0) : people
   // Select the responsible household contact, or the relative with strongest existing ties.
   return [...options].sort(
     (a, b) =>
-      Number(b.id === authority(s, b.house)) -
-        Number(a.id === authority(s, a.house)) ||
-      b.closeness - a.closeness ||
-      a.id.localeCompare(b.id),
+      Number(b.id === authority(s, b.house!)) -
+        Number(a.id === authority(s, a.house!)) ||
+      attitude(s,b).closeness - attitude(s,a).closeness ||
+      keyFor(s,a.id).localeCompare(keyFor(s,b.id)),
   )[0]
 }
-export function allowed(s: State, id: string, a: Action) {
+export function allowed(s: Game, id: string, a: Action) {
   if (
     ['siblingPlan', 'spousePlan', 'medicine', 'letterHome'].includes(id) &&
     !participant(s, id)
@@ -149,7 +152,7 @@ export function allowed(s: State, id: string, a: Action) {
   if (a === 'pledge') return !s.promise
   return true
 }
-export function narrative(s: State, id: string, body: string) {
+export function narrative(s: Game, id: string, body: string) {
   const n = participant(s, id)
   if (!n) return body
   const who = n.role + ' ' + n.name
@@ -193,13 +196,13 @@ export function narrative(s: State, id: string, body: string) {
       return (
         who +
         '从旧家捎信，请你帮着还债。\n' +
-        (n.history.some((m) => m.id === 'care')
+        (attitude(s,n).history.some((m) => m.id === 'care')
           ? '“还记得那回你留下照应我。这次又要你费心了。”'
           : '“有余钱便捎一点。若手紧，给我个准信，我好另作打算。”')
       )
     case 'wedding': {
-      const guardian = s.npcs.find(
-        (k) => k.alive && k.id === authority(s, s.residence),
+      const guardian = residents(s).find(
+        (k) => k.alive && k.id === authority(s, player(s).residence),
       )
       return (
         (guardian
