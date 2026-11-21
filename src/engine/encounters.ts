@@ -78,9 +78,6 @@ export function negotiate(s: Game, n: Person, id: string, a: Action, r: number) 
       s.promise = { id: n.id, due: s.year + 1 }
       remember(s, n, 'promise', 0.03)
       return n.name + '收到回信，等你来年从私钱中匀出至多六钱。'
-    case 'meet':
-      remember(s, n, 'meeting', 0.08)
-      return '你先同' + n.name + '谈过成家后的用度，约定日后再议。'
     case 'waitPlan':
       remember(s, n, 'delay', -0.02)
       return n.name + '收回自己的钱，打算先攒着。'

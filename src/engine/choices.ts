@@ -1,3 +1,4 @@
+import { conclude, hasReply, schedule, willing } from './negotiations.ts'
 import { childhoodScene, preparation } from '../content/western-han/childhood.ts'
 import { eligible, participant, bindCandidate } from '../content/western-han/events.ts'
 import { homes, type Action } from '../data.ts'
@@ -86,11 +87,20 @@ export function resolveChoice(s: Game, action: Action) {
     case 'medicineFee':
     case 'nurse':
     case 'pledge':
-    case 'meet':
     case 'waitPlan':
       if (!involved) throw Error('缺少参与者')
       actors = [involved.id]
       result = negotiate(s, involved, cause, action, r)
+      break
+    case 'meet':
+    case 'terms':
+      actors = [involved!.id]
+      if (action === 'meet') remember(s,involved!, 'meeting', 0.08)
+      result = schedule(s,involved!,action)
+      break
+    case 'declineMatch':
+      actors = [involved!.id]
+      result = conclude(s,involved!, 'declined')
       break
     case 'pass':
       if (cause === 'medicine' && involved) {
@@ -100,8 +110,8 @@ export function resolveChoice(s: Game, action: Action) {
       result =
         cause === 'medicine'
           ? involved!.name + '依自己的意思在家静养。'
-          : cause === 'wedding'
-            ? '两家约好以后再回话。'
+          : (cause === 'wedding' || cause === 'weddingReply')
+            ? '你托媒人暂缓此事，没有约定再议的日子。'
             : cause === 'demand'
               ? '你指给他看旧户的名字，他收起了账。'
               : '你收起荷包。'
@@ -265,30 +275,21 @@ export function resolveChoice(s: Game, action: Action) {
     }
     case 'marry': {
       const partner = currentCandidate(s)!
-      const ok =
-        account(s).cash >= 6 &&
-        r <
-          0.45 +
-            0.15 * partner.generosity +
-            0.09 * Number(attitude(s,partner).history.some((m) => m.id === 'meeting')) +
-            0.08 * Number(p.skill >= 3) +
-            0.12 * Number(account(s).debt === 0)
-      if (ok) {
+      if (account(s).cash < 6) {
+        result = '你愿成婚，可家户眼下凑不出六钱，这次未能成礼。'
+      } else if (cause === 'weddingReply' ? hasReply(s) : willing(s,partner,r)) {
         account(s).cash -= 6
         joinFamily(s, partner)
         clearCandidate(s)
+        result = partner.name+'应下婚事，两人从此同过。'
+      } else {
+        actors = [partner.id]
+        result = conclude(s,partner,'refused')
       }
-      result =
-        partner.name +
-        (ok
-          ? '应下婚事，两人从此同过。'
-          : partner.goal === '积谷'
-            ? '想再攒些过冬的钱，婚事先缓一缓。'
-            : '想再见一面，将日后的打算说清。')
       break
     }
   }
-  if (cause === 'wedding') {
+  if (cause === 'wedding' || cause === 'weddingReply') {
     s.wedding.attempts++
     s.wedding.state = Boolean(partnerOf(s,pid)) ? 'resolved' : 'deferred'
     s.wedding.next = p.age + 3

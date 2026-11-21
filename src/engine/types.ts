@@ -44,7 +44,18 @@ type Entry = {
   fact?: string
   decision?: string
 }
+export type ReplyOutcome = 'willing' | 'refused' | 'withdrawn' | 'changedPlans' | 'illness' | 'candidateDeath' | 'playerDeath' | 'ineligible' | 'declined'
+export type Negotiation = {
+  person: string
+  opened: number
+  contact: 'meet' | 'terms' | 'immediate'
+  due: number | null
+  result?: { year: number; outcome: ReplyOutcome }
+}
 export type State = {
+  archivedCandidates?: Kin[]
+  exportedPersonKeys?: Record<string,string>
+  negotiations?: Negotiation[]
   // Supplied only by the person-graph compatibility adapter.
   playerParentKeys?: string[]
   loans: import('./legal.ts').Loan[]

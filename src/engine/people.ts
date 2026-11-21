@@ -27,7 +27,7 @@ type Graph = {
   nextPerson: number
 }
 type World = Omit<State, typeof playerFields[number] | 'playerParentKeys' | 'spouse' | 'candidate' | 'marriage' | 'unions' |
-  'npcs' | 'cash' | 'assets' | 'debt' | 'estates'>
+  'exportedPersonKeys' | 'archivedCandidates' | 'npcs' | 'cash' | 'assets' | 'debt' | 'estates'>
 export type Life = World & Graph
 
 function resolve(keys: Map<string,string>, key: string, field: string) {
@@ -36,7 +36,7 @@ function resolve(keys: Map<string,string>, key: string, field: string) {
   return id
 }
 
-function mapReferences<T extends Pick<State,'loans'|'settlements'|'heads'|'promise'|'news'|'chronicle'|'ledger'>>(
+function mapReferences<T extends Pick<State,'negotiations'|'loans'|'settlements'|'heads'|'promise'|'news'|'chronicle'|'ledger'>>(
   s: T, active: (key:string, field:string)=>string, historical: (key:string)=>string,
 ) {
   // Entries can be shared between chronicle and ledger. Translate each object once.
@@ -47,6 +47,7 @@ function mapReferences<T extends Pick<State,'loans'|'settlements'|'heads'|'promi
       visited.add(row)
     }
   }
+  for (const row of s.negotiations ?? []) row.person = active(row.person,'negotiations.person')
   for (const loan of s.loans) loan.debtor = active(loan.debtor,'loan.debtor')
   for (const record of s.settlements) {
     record.owner = active(record.owner,'settlement.owner')
@@ -74,25 +75,36 @@ export function marriageSummary(g: Graph): State['marriage'] {
 // Convert a detached command result. Older entities and closed unions carry forward.
 export function collectPeople(source: State, prior?: Life, lostCandidate?: Kin): Life {
   const snapshot = structuredClone(source)
-  const { npcs, candidate, spouse, marriage, unions, playerParentKeys, ...world } = snapshot
+  const { npcs, exportedPersonKeys, archivedCandidates = [], candidate, spouse, marriage, unions, playerParentKeys, ...world } = snapshot
   const g: Graph = {
     playerId: prior?.playerId ?? 'p0', nextPerson: prior?.nextPerson ?? 1,
     people: { ...prior?.people }, legacyKeys: { ...prior?.legacyKeys },
     towardPlayer: { ...prior?.towardPlayer }, parentIds: { ...prior?.parentIds },
     marriages: structuredClone(prior?.marriages ?? []), residentOrder: [], candidateId: null,
   }
+  // A Stage A export may contain former candidates interleaved with later residents.
+  // Preserve its IDs even though flat clients enumerate residents before visitors.
+  if (!prior && exportedPersonKeys) {
+    if (exportedPersonKeys[g.playerId] !== 'player') throw Error('Invalid exported protagonist')
+    for (const [id,key] of Object.entries(exportedPersonKeys)) {
+      if (!/^p(0|[1-9]\d*)$/.test(id) || !Number.isSafeInteger(Number(id.slice(1))) || !key)
+        throw Error('Invalid exported person key')
+      g.legacyKeys[id] = key
+      g.nextPerson = Math.max(g.nextPerson, Number(id.slice(1))+1)
+    }
+  }
   g.legacyKeys[g.playerId] = 'player'
   const keys = new Map(Object.entries(g.legacyKeys).map(([id,key])=>[key,id]))
   const required = (key:string, field:string) => resolve(keys,key,field)
   // An old candidate can leave only a ledger reference in a Stage 1 snapshot.
   const historic = (key:string) => keys.get(key) ?? 'unresolved:' + key
-  const people = [...npcs]
-  if (source.pending === 'wedding' && !candidate && !prior) throw Error('Missing pending marriage candidate')
+  const people = [...npcs,...archivedCandidates]
+  if (['wedding','weddingReply'].includes(source.pending) && !candidate && !prior) throw Error('Missing pending marriage candidate')
   if (candidate) {
     if (!candidate.alive || candidate.partner !== null || spouse !== null) throw Error('Invalid active candidate: '+candidate.id)
     people.push(candidate)
   }
-  if (lostCandidate) people.push(lostCandidate)
+  if (lostCandidate && !people.some(n=>n.id===lostCandidate.id)) people.push(lostCandidate)
   const encountered = new Set(['player'])
   for (const n of people) {
     if (encountered.has(n.id)) throw Error('Duplicate legacy person: ' + n.id)
@@ -115,7 +127,7 @@ export function collectPeople(source: State, prior?: Life, lostCandidate?: Kin):
   for (const n of people) {
     const {id:key,parents,partner,trust,closeness,conflict,history,house,...facts} = n
     const id = required(key,'person')
-    const external = n === candidate || n === lostCandidate
+    const external = n === candidate || n === lostCandidate || archivedCandidates.includes(n)
     g.people[id] = { ...facts, kind:'relative', id, house:external ? null : house }
     g.parentIds[id] = parents.map(key=>required(key,'parents'))
     g.towardPlayer[id] = {trust,closeness,conflict,history:translateMemory(history,historic)}
@@ -143,7 +155,7 @@ export function collectPeople(source: State, prior?: Life, lostCandidate?: Kin):
     for (const n of npcs) {
       if (n.role !== '伴侣' || n.id === spouse) continue
       const id = required(n.id,'former spouse')
-      const evidence = world.ledger.find(e=>e.cause==='wedding' && e.actors?.includes(id) && e.decision?.endsWith(':marry'))
+      const evidence = world.ledger.find(e=>(e.cause==='wedding' || e.cause==='weddingReply') && e.actors?.includes(id) && e.decision?.endsWith(':marry'))
       g.marriages.push({ pair:[g.playerId,id], start:evidence?.year ?? null,
         end:{year:null,cause:n.alive && player.dead ? 'ended' : 'widowed'} })
     }
@@ -156,7 +168,7 @@ export function collectPeople(source: State, prior?: Life, lostCandidate?: Kin):
   for (const [a,b] of partners) {
     const pair: [string,string] = [required(a,'union'),required(b,'union')]
     if (g.marriages.some(u=>!u.end && pair.every(id=>u.pair.includes(id)))) continue
-    const evidence = pair.includes(g.playerId) && world.ledger.find(e=>e.cause==='wedding' &&
+    const evidence = pair.includes(g.playerId) && world.ledger.find(e=>(e.cause==='wedding' || e.cause==='weddingReply') &&
       e.decision?.endsWith(':marry') && pair.every(id=>e.actors?.includes(id)))
     g.marriages.push({pair,start:prior ? world.year : (evidence ? evidence.year ?? null : null),end:null})
   }
@@ -204,12 +216,16 @@ export function legacyPeopleView(state: Life): State {
       id:key(id),role:n.role,age:n.age,name:n.name,alive:n.alive,health:n.health,work:n.work,position:n.position,
       goal:n.goal,generosity:n.generosity,trust:attitude.trust,closeness:attitude.closeness,money:n.money,memories:n.memories}
   }
+  const archived = Object.keys(people).filter(id => id !== candidateId && people[id].kind === 'relative' &&
+    !residentOrder.includes(id) && world.negotiations?.length)
   mapReferences(world,key,historic)
   // Public compatibility projections cannot be used as a second account ledger.
   for (const book of Object.values(world.households)) Object.freeze(book)
   Object.freeze(world.households)
   return withAccountViews({...world,...p,playerParentKeys:parentIds[playerId].map(key),spouse:partners.has(playerId)?key(partners.get(playerId)!):null,
     marriage:marriageSummary(graph),unions:playerUnions(graph).length,npcs:residentOrder.map(kin),
+    ...(world.negotiations?.length ? {exportedPersonKeys:legacyKeys} : {}),
+    ...(archived.length ? {archivedCandidates:archived.map(kin)} : {}),
     candidate:candidateId ? kin(candidateId) : null})
 }
 
@@ -238,6 +254,16 @@ export function validatePeople(s: Life) {
     for (const memory of s.towardPlayer[id].history) for (const actor of memory.actors)
       if (!actor.startsWith('unresolved:')) defined(actor)
   }
+  const closed = new Set<string>()
+  for (const [index,row] of (s.negotiations ?? []).entries()) {
+    defined(row.person)
+    if (s.people[row.person].kind !== 'relative' ||
+      (row.contact === 'immediate' ? row.due !== null : row.due !== row.opened+(row.contact === 'meet' ? 1 : 2)))
+      throw Error('Invalid marriage appointment')
+    if (!row.result && (row.person !== s.candidateId || index !== s.negotiations!.length-1 || player.dead))
+      throw Error('Orphan marriage appointment')
+    if (row.result && row.result.outcome !== 'willing') closed.add(row.person)
+  }
   const complete = new Set<string>()
   function ancestry(id:string, chain:Set<string>) {
     defined(id)
@@ -258,7 +284,7 @@ export function validatePeople(s: Life) {
       throw Error('Invalid stable identity: '+id)
     if (n.kind === 'relative') {
       if (roster.has(id) !== (n.house !== null) || !s.towardPlayer[id]) throw Error('Invalid membership: '+id)
-      if (n.alive && n.house === null && id !== s.candidateId) throw Error('Untracked external person: '+id)
+      if (n.alive && n.house === null && id !== s.candidateId && !closed.has(id)) throw Error('Untracked external person: '+id)
     }
   }
   const partnered = new Set<string>()

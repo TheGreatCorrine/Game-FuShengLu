@@ -60,6 +60,8 @@ it('keeps a single external candidate through meeting and marriage; historical d
   expect(met.people[id]).toMatchObject({house:null})
   expect(met.residentOrder).not.toContain(id)
   const next=structuredClone(life.legacyPeopleView(met))
+  // This fixture simulates an external client completing an agreed meeting.
+  next.negotiations![0].result = {year:next.year,outcome:'willing'}
   joinFamily(next,next.candidate!)
   next.candidate=null
   const joined=collectPeople(next,met)

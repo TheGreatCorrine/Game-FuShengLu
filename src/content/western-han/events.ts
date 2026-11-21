@@ -1,3 +1,4 @@
+import { appointment, hasReply } from '../../engine/negotiations.ts'
 import { childhoodScene, companion, preparedChoice } from './childhood.ts'
 import { marriageSummary } from '../../engine/people.ts'
 import { inLawParents, attitude, birthSibling, parentsOf, partnerOf, playerId, residents, keyFor, canonical, currentCandidate, player, kinContext, register, unionCount, type Game, type Person } from '../../engine/domain.ts'
@@ -34,7 +35,7 @@ export function eligible(s: Game) {
         p.age >= e.min &&
         p.age <= e.max &&
         (!childhoodScene(e.id) || !!companion(s,e.id)) &&
-        (!s.seen.includes(e.id) || e.id === 'wedding' || e.id === 'collect') &&
+        (!s.seen.includes(e.id) || e.id === 'wedding' || e.id === 'weddingReply' || e.id === 'collect') &&
         (e.id !== 'relief' ||
           (account(s).debt >= 8 &&
             living(s).some(
@@ -45,7 +46,8 @@ export function eligible(s: Game) {
             (s.households.birth?.debt ?? 0) >= 8 &&
             p.purse >= 1 &&
             living(s).some((n) => n.house === 'birth'))) &&
-        (e.id !== 'wedding' || p.age >= s.wedding.next) &&
+        (e.id !== 'wedding' || (!appointment(s) && p.age >= s.wedding.next)) &&
+        (e.id !== 'weddingReply' || (s.pending === 'weddingReply' && hasReply(s))) &&
         (!e.gate ||
           {
             books: homes[p.home].books > 0,
@@ -100,7 +102,7 @@ export function participant(s: Game, id: string) {
   const local = residents(s).filter((n) => n.alive && n.house === player(s).residence)
   if (id === 'turn' || id === 'studyConflict' || id === 'letters')
     return local.find((n) => n.id === authority(s, player(s).residence))
-  if (id === 'wedding') return canonical(s) ? currentCandidate(s) ?? undefined : candidate(s)
+  if (id === 'wedding' || id === 'weddingReply') return canonical(s) ? currentCandidate(s) ?? undefined : candidate(s)
   if (id === 'siblingPlan')
     return local.find(
       (n) =>
@@ -210,6 +212,7 @@ export function narrative(s: Game, id: string, body: string) {
           ? '“还记得那回你留下照应我。这次又要你费心了。”'
           : '“有余钱便捎一点。若手紧，给我个准信，我好另作打算。”')
       )
+    case 'weddingReply': return n.name+'按约回话：“我愿成这门亲。你自己的意思呢？”'
     case 'wedding': {
       const guardian = residents(s).find(
         (k) => k.alive && k.id === authority(s, player(s).residence),

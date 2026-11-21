@@ -128,6 +128,8 @@ export type Action =
   | 'nurse'
   | 'pledge'
   | 'meet'
+  | 'terms'
+  | 'declineMatch'
   | 'waitPlan'
   | 'trialSkill'
 export type Scene = {
@@ -354,10 +356,17 @@ export const scenes: Scene[] = [
     title: '托人问意',
     body: '相识的人家托人来问你的意思。两家来往，日后也要共同承担开销。',
     choices: [
-      ['请媒人回话', 'marry'],
-      ['先同对方商量婚后用度', 'meet'],
+      ['答应婚事，请媒人回话', 'marry'],
+      ['先见一面，约来年回话', 'meet'],
       ['暂缓回帖', 'pass'],
+      ['商量两家用度，约两年后回话', 'terms'],
+      ['婉拒这门亲事', 'declineMatch'],
     ],
+  },
+  {
+    id: 'weddingReply', min: 20, max: 52, weight: 0, gate: 'single',
+    title: '婚议的回音', body: '媒人按约带来了回话。',
+    choices: [['答应婚事', 'marry'], ['暂缓回帖', 'pass'], ['婉拒这门亲事', 'declineMatch']],
   },
   ...(
     [

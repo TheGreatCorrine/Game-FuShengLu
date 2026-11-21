@@ -1,3 +1,6 @@
+import { appointment, conclude, respond } from './negotiations.ts'
+import { marriageSummary } from './people.ts'
+import { rules } from '../data.ts'
 import { childhoodNote, childhoodPause, childhoodScene } from '../content/western-han/childhood.ts'
 import { bindCandidate, eligible } from '../content/western-han/events.ts'
 import { canonical, currentCandidate, clearCandidate, player, playerId, keyFor, residents, type Game } from './domain.ts'
@@ -52,6 +55,7 @@ export function runYear(s: Game, onCandidateDeath?: (person: Kin) => void) {
   if (!p.dead) developFamily(s)
   if (!p.health) {
     p.dead = true
+    if (appointment(s)) record(s,conclude(s,currentCandidate(s)!,'playerDeath'),'weddingReply')
     record(
       s,
       p.acute
@@ -77,10 +81,22 @@ export function runYear(s: Game, onCandidateDeath?: (person: Kin) => void) {
     if (h.dead) {
       n.alive = false
       n.acute = h.acute
-      if (!canonical(s) && 'parents' in n) onCandidateDeath?.(n)
+      if (!canonical(s) && 'parents' in n) {
+        onCandidateDeath?.(n)
+        if (!appointment(s) && s.negotiations?.length) (s.archivedCandidates ??= []).push(n)
+      }
+      const notice = appointment(s) ? conclude(s,n,'candidateDeath') : n.name+'的故讯传来，先前的婚议就此作罢。'
       clearCandidate(s)
       s.wedding.attempts++
-      record(s, n.name + '的故讯传来，先前的婚议就此作罢。')
+      record(s, notice)
+    } else if (appointment(s)) {
+      const widowed = (canonical(s) ? marriageSummary(s) : s.marriage) === 'widowed'
+      const expired = p.age > (widowed ? rules.family.widowAgeLimit : 34)
+      if (expired || s.year >= appointment(s)!.due!) {
+        const outcome = expired ? 'ineligible' : respond(s,n,h.acute)
+        record(s,conclude(s,n,outcome),'weddingReply')
+        if (outcome === 'willing') s.pending = 'weddingReply'
+      }
     }
   }
   mature(s)
@@ -94,6 +110,7 @@ export function runYear(s: Game, onCandidateDeath?: (person: Kin) => void) {
     s.wedding.state = 'eligible'
   const note = childhoodNote(s)
   if (note) record(s,note)
+  if (s.pending) return
   const eligibleScenes = eligible(s)
   const childhood = childhoodPause(s,eligibleScenes)
   const pool = eligibleScenes.filter(e => !childhoodScene(e.id)),
