@@ -14,3 +14,5 @@ Stage 0 的三项决定已获批准：人物只保留一个当前家户归属，
 7. [Stage 2 人物与关系](07_STAGE_2_REPORT.md)
 8. [Stage 3 年度调度与领域操作](08_STAGE_3_REPORT.md)
 9. [Stage 4 西汉内容、玩家观察与适配层退出计划](09_STAGE_4_REPORT.md)
+10. [Stage 4.5 执行迁移顺序](10_STAGE_4_5_SEQUENCE.md)
+11. [Stage 4.5 实现、回归对照与性能报告](11_STAGE_4_5_REPORT.md)
