@@ -129,6 +129,7 @@ export type Action =
   | 'pledge'
   | 'meet'
   | 'terms'
+  | 'planWedding' | 'plainWedding' | 'familyGift' | 'stayCare' | 'waitWedding'
   | 'declineMatch'
   | 'waitPlan'
   | 'trialSkill'
@@ -361,12 +362,20 @@ export const scenes: Scene[] = [
       ['暂缓回帖', 'pass'],
       ['商量两家用度，约两年后回话', 'terms'],
       ['婉拒这门亲事', 'declineMatch'],
+      ['愿意成婚，先议怎样安家', 'planWedding'],
     ],
   },
   {
     id: 'weddingReply', min: 20, max: 52, weight: 0, gate: 'single',
     title: '婚议的回音', body: '媒人按约带来了回话。',
-    choices: [['答应婚事', 'marry'], ['暂缓回帖', 'pass'], ['婉拒这门亲事', 'declineMatch']],
+    choices: [['答应婚事', 'marry'], ['暂缓回帖', 'pass'], ['婉拒这门亲事', 'declineMatch'], ['愿意成婚，先议怎样安家','planWedding']],
+  },
+  {
+    id:'arrangements', min:20, max:999, weight:0, title:'两个人的打算',
+    body:'婚意已定，商量怎样成家。',
+    choices:[['由本户出六钱成礼','marry'],['从简成礼，本户出两钱','plainWedding'],
+      ['问家人可愿补足两钱简礼的差额','familyGift'],['商量留居本户，婚后照料亲人','stayCare'],
+      ['约来年再议','waitWedding'],['亲自说明退约','declineMatch']],
   },
   ...(
     [

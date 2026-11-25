@@ -100,7 +100,7 @@ export function helpChance(s: Game, n: Person) {
       memory,
   )
 }
-export function joinFamily(s: Game, p: Person) {
+export function joinFamily(s: Game, p: Person, stay = false) {
   const self = player(s), pid = playerId(s)
   if (self.dead || !p.alive || partnerOf(s,p.id) || partnerOf(s,pid) || p.id === pid || residents(s).some(n => n.id === p.id))
     throw Error('Invalid household marriage admission: ' + p.id)
@@ -108,7 +108,7 @@ export function joinFamily(s: Game, p: Person) {
     throw Error('Unregistered marriage candidate')
   const serial = unionCount(s) + 1,
     origin = 'kin' + serial
-  const allocation = { cash: Math.floor(homes[p.background].coins / 2), assets: 1, debt: 0 }
+  // A newly represented residence has no recorded property to transfer.
   const r = (k: string) => random(s.seed, origin + k)
   for (const [i, chance] of [0.78, 0.46].entries()) {
     if (r('relative' + i) > chance) continue
@@ -119,6 +119,7 @@ export function joinFamily(s: Game, p: Person) {
       origin + 'elder' + i,
     )
     if (!i) elder.name = p.name[0] + elder.name.slice(1)
+    elder.money = 0
     elder.tier = 2
     elder.sex = i ? '女' : '男'
     elder.house = origin
@@ -131,15 +132,11 @@ export function joinFamily(s: Game, p: Person) {
   }
   // A later spouse joins the established household, keeping children resident.
   const elders = residents(s).some(n => n.house === origin)
-  const moving = serial === 1 && r('move') < (account(s).cash < 30 ? 0.75 : 0.48)
+  const moving = !stay && serial === 1 && r('move') < (account(s).cash < 30 ? 0.75 : 0.48)
   if (elders || moving) {
     const destination = elders ? origin : 'independent'
-    openHouse(s, destination, allocation)
+    openHouse(s, destination, {cash:0, assets:0, debt:0})
     if (moving) moveResidence(s, destination)
-  } else {
-    // An unrepresented spouse household contributes its original endowment once.
-    account(s).cash += allocation.cash
-    account(s).assets += allocation.assets
   }
   p.house = self.residence
   if (canonical(s)) {

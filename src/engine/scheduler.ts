@@ -1,3 +1,4 @@
+import { agreement, annualArrangement, endAgreement, fulfillCare } from './marriage-arrangements.ts'
 import { appointment, conclude, respond } from './negotiations.ts'
 import { marriageSummary } from './people.ts'
 import { rules } from '../data.ts'
@@ -53,8 +54,11 @@ export function runYear(s: Game, onCandidateDeath?: (person: Kin) => void) {
   finishResidentDeaths(s,ageResidents(s,residents(s),id => keyFor(s,id)))
   household(s)
   if (!p.dead) developFamily(s)
+  const care=fulfillCare(s)
+  if (care) record(s,care,'arrangements')
   if (!p.health) {
     p.dead = true
+    if (agreement(s)) record(s,endAgreement(s,'playerDeath'),'arrangements')
     if (appointment(s)) record(s,conclude(s,currentCandidate(s)!,'playerDeath'),'weddingReply')
     record(
       s,
@@ -83,12 +87,15 @@ export function runYear(s: Game, onCandidateDeath?: (person: Kin) => void) {
       n.acute = h.acute
       if (!canonical(s) && 'parents' in n) {
         onCandidateDeath?.(n)
-        if (!appointment(s) && s.negotiations?.length) (s.archivedCandidates ??= []).push(n)
+        if (!agreement(s) && !appointment(s) && s.negotiations?.length) (s.archivedCandidates ??= []).push(n)
       }
-      const notice = appointment(s) ? conclude(s,n,'candidateDeath') : n.name+'的故讯传来，先前的婚议就此作罢。'
+      const notice = agreement(s) ? endAgreement(s,'candidateDeath') : appointment(s) ? conclude(s,n,'candidateDeath') : n.name+'的故讯传来，先前的婚议就此作罢。'
       clearCandidate(s)
       s.wedding.attempts++
       record(s, notice)
+    } else if (agreement(s)) {
+      const notice=annualArrangement(s)
+      if (notice) record(s,notice,'arrangements')
     } else if (appointment(s)) {
       const widowed = (canonical(s) ? marriageSummary(s) : s.marriage) === 'widowed'
       const expired = p.age > (widowed ? rules.family.widowAgeLimit : 34)

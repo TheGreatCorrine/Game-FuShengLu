@@ -45,7 +45,20 @@ type Entry = {
   decision?: string
 }
 export type ReplyOutcome = 'willing' | 'refused' | 'withdrawn' | 'changedPlans' | 'illness' | 'candidateDeath' | 'playerDeath' | 'ineligible' | 'declined'
+export type MarriageAgreement = {
+  since: number
+  next: number
+  endedYear?: number
+  simpleTerms?: 'accepted' | 'declined'
+  askedGift?: number
+  askedCare?: boolean
+  careFor?: string
+  careResult?: 'visited' | 'ended'
+  closed?: 'married' | 'withdrawn' | 'declined' | 'candidateDeath' | 'playerDeath'
+  receipt?: { year: number; house: string; cash: number; donor?: string; gift: number }
+}
 export type Negotiation = {
+  agreement?: MarriageAgreement
   person: string
   opened: number
   contact: 'meet' | 'terms' | 'immediate'

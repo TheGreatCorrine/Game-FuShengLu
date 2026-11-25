@@ -1,3 +1,4 @@
+import { agreement, careRelative } from '../../engine/marriage-arrangements.ts'
 import { appointment, hasReply } from '../../engine/negotiations.ts'
 import { childhoodScene, companion, preparedChoice } from './childhood.ts'
 import { marriageSummary } from '../../engine/people.ts'
@@ -35,7 +36,7 @@ export function eligible(s: Game) {
         p.age >= e.min &&
         p.age <= e.max &&
         (!childhoodScene(e.id) || !!companion(s,e.id)) &&
-        (!s.seen.includes(e.id) || e.id === 'wedding' || e.id === 'weddingReply' || e.id === 'collect') &&
+        (!s.seen.includes(e.id) || e.id === 'wedding' || e.id === 'weddingReply' || e.id === 'arrangements' || e.id === 'collect') &&
         (e.id !== 'relief' ||
           (account(s).debt >= 8 &&
             living(s).some(
@@ -46,8 +47,9 @@ export function eligible(s: Game) {
             (s.households.birth?.debt ?? 0) >= 8 &&
             p.purse >= 1 &&
             living(s).some((n) => n.house === 'birth'))) &&
-        (e.id !== 'wedding' || (!appointment(s) && p.age >= s.wedding.next)) &&
+        (e.id !== 'wedding' || (!appointment(s) && !agreement(s) && p.age >= s.wedding.next)) &&
         (e.id !== 'weddingReply' || (s.pending === 'weddingReply' && hasReply(s))) &&
+        (e.id !== 'arrangements' || (s.pending==='arrangements' && !!agreement(s) && agreement(s)!.next<=s.year)) &&
         (!e.gate ||
           {
             books: homes[p.home].books > 0,
@@ -102,7 +104,7 @@ export function participant(s: Game, id: string) {
   const local = residents(s).filter((n) => n.alive && n.house === player(s).residence)
   if (id === 'turn' || id === 'studyConflict' || id === 'letters')
     return local.find((n) => n.id === authority(s, player(s).residence))
-  if (id === 'wedding' || id === 'weddingReply') return canonical(s) ? currentCandidate(s) ?? undefined : candidate(s)
+  if (id === 'wedding' || id === 'weddingReply' || id === 'arrangements') return canonical(s) ? currentCandidate(s) ?? undefined : candidate(s)
   if (id === 'siblingPlan')
     return local.find(
       (n) =>
@@ -156,6 +158,12 @@ export function allowed(s: Game, id: string, a: Action) {
   )
     return false
   if (id === 'feast' && a === 'bond') return !!participant(s, id)
+  if (id==='arrangements') {
+    if (a==='marry') return account(s).cash>=6
+    if (a==='plainWedding') return account(s).cash>=2 && agreement(s)?.simpleTerms!=='declined'
+    if (a==='familyGift') return agreement(s)?.simpleTerms!=='declined' && account(s).cash<2 && agreement(s)?.askedGift!==s.year
+    if (a==='stayCare') return !!careRelative(s) && !agreement(s)?.askedCare
+  }
   if (a === 'split') return spendable(s) >= 4
   if (a === 'medicineFee') return spendable(s) >= 5
   if (a === 'stake') return spendable(s) >= 3
@@ -212,6 +220,7 @@ export function narrative(s: Game, id: string, body: string) {
           ? '“还记得那回你留下照应我。这次又要你费心了。”'
           : '“有余钱便捎一点。若手紧，给我个准信，我好另作打算。”')
       )
+    case 'arrangements': return n.name+'与你已有婚约。常礼用六钱，从简只用两钱。'+(agreement(s)?.careFor && !agreement(s)?.careResult?'已约定留居本户照料亲人。':'也可以约定来年再议。')
     case 'weddingReply': return n.name+'按约回话：“我愿成这门亲。你自己的意思呢？”'
     case 'wedding': {
       const guardian = residents(s).find(

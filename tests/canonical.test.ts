@@ -27,7 +27,7 @@ it('generates, advances, skips, observes and resolves complete lives with snapsh
       const original = structuredClone(input)
       life = decide(life,scene.choices[0][1])
       expect(input).toEqual(original)
-      expect(life.pending).toBe('')
+      expect(['','arrangements']).toContain(life.pending)
       decisions++
     } while (!player(life).dead)
   }

@@ -1,11 +1,12 @@
-import { conclude, hasReply, schedule, willing } from './negotiations.ts'
+import { acceptMarriage, agreement, arrangeCare, celebrate, endAgreement, postponeWedding } from './marriage-arrangements.ts'
+import { conclude, schedule } from './negotiations.ts'
 import { childhoodScene, preparation } from '../content/western-han/childhood.ts'
 import { eligible, participant, bindCandidate } from '../content/western-han/events.ts'
 import { homes, type Action } from '../data.ts'
 import { account } from './accounts.ts'
-import { attitude, clearCandidate, currentCandidate, partnerOf, player, playerId, residents, type Game, type Person } from './domain.ts'
+import { attitude, currentCandidate, partnerOf, player, playerId, residents, type Game, type Person } from './domain.ts'
 import { negotiate } from './encounters.ts'
-import { joinFamily, remember, helpChance } from './family.ts'
+import { remember, helpChance } from './family.ts'
 import { authority, borrow, credit, outstanding, repay, spendable } from './legal.ts'
 import { changeOccupation, payHouseDebt } from './operations.ts'
 import { random } from './rng.ts'
@@ -38,6 +39,7 @@ export function resolveChoice(s: Game, action: Action) {
   const choice = event?.choices.find((c) => c[1] === action)
   if (!event || !choice) throw Error('此项选择当前不可用')
   const p = player(s), pid = playerId(s)
+  const payingHouse = p.residence
   const before = {cash:account(s).cash, skill:p.skill, purse:p.purse, practice:p.practice}
   const
     cause = event.id,
@@ -100,7 +102,7 @@ export function resolveChoice(s: Game, action: Action) {
       break
     case 'declineMatch':
       actors = [involved!.id]
-      result = conclude(s,involved!, 'declined')
+      result = agreement(s) ? endAgreement(s,'declined') : conclude(s,involved!, 'declined')
       break
     case 'pass':
       if (cause === 'medicine' && involved) {
@@ -273,41 +275,40 @@ export function resolveChoice(s: Game, action: Action) {
       result = ok ? '核账无误，往后来此谋生。' : '账目未合，仍操旧业。'
       break
     }
-    case 'marry': {
-      const partner = currentCandidate(s)!
-      if (account(s).cash < 6) {
-        result = '你愿成婚，可家户眼下凑不出六钱，这次未能成礼。'
-      } else if (cause === 'weddingReply' ? hasReply(s) : willing(s,partner,r)) {
-        account(s).cash -= 6
-        joinFamily(s, partner)
-        clearCandidate(s)
-        result = partner.name+'应下婚事，两人从此同过。'
-      } else {
-        actors = [partner.id]
-        result = conclude(s,partner,'refused')
-      }
+    case 'planWedding':
+    case 'marry':
+      actors=[currentCandidate(s)!.id]
+      result=cause==='arrangements' ? celebrate(s,6) : acceptMarriage(s,action==='planWedding')
       break
-    }
+    case 'plainWedding':
+    case 'familyGift':
+      actors=[currentCandidate(s)!.id]
+      result=celebrate(s,2,action==='familyGift')
+      break
+    case 'stayCare':
+      result=arrangeCare(s)
+      break
+    case 'waitWedding':
+      result=postponeWedding(s)
+      break
   }
-  if (cause === 'wedding' || cause === 'weddingReply') {
-    s.wedding.attempts++
-    s.wedding.state = Boolean(partnerOf(s,pid)) ? 'resolved' : 'deferred'
+  if (cause === 'wedding' || cause === 'weddingReply' || cause==='arrangements') {
+    if (cause!=='arrangements') s.wedding.attempts++
+    s.wedding.state = partnerOf(s,pid) ? 'resolved' : 'deferred'
     s.wedding.next = p.age + 3
   }
   record(s, choice[0] + '。' + result, cause)
-  s.pending = ''
+  s.pending = agreement(s) && agreement(s)!.next<=s.year ? 'arrangements' : ''
   Object.assign(s.ledger.at(-1)!, {
     decision: cause + ':' + p.age + ':' + action,
     actors: [
       pid,
       ...actors,
       ...(action === 'learn' && adult ? [adult.id] : []),
-      ...(action === 'marry' && s.wedding.state === 'resolved'
-        ? [partnerOf(s,pid)!]
-        : []),
+
     ],
     changes: {
-      cash: account(s).cash - before.cash,
+      cash: (['wedding','weddingReply','arrangements'].includes(cause) ? s.households[payingHouse].cash : account(s).cash) - before.cash,
       skill: p.skill - before.skill,
       purse: p.purse - before.purse,
       practice: p.practice - before.practice,

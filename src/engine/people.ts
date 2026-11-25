@@ -47,7 +47,12 @@ function mapReferences<T extends Pick<State,'negotiations'|'loans'|'settlements'
       visited.add(row)
     }
   }
-  for (const row of s.negotiations ?? []) row.person = active(row.person,'negotiations.person')
+  for (const row of s.negotiations ?? []) {
+    row.person = active(row.person,'negotiations.person')
+    const a=row.agreement
+    if (a?.careFor) a.careFor=active(a.careFor,'agreement.careFor')
+    if (a?.receipt?.donor) a.receipt.donor=active(a.receipt.donor,'receipt.donor')
+  }
   for (const loan of s.loans) loan.debtor = active(loan.debtor,'loan.debtor')
   for (const record of s.settlements) {
     record.owner = active(record.owner,'settlement.owner')
@@ -99,7 +104,7 @@ export function collectPeople(source: State, prior?: Life, lostCandidate?: Kin):
   // An old candidate can leave only a ledger reference in a Stage 1 snapshot.
   const historic = (key:string) => keys.get(key) ?? 'unresolved:' + key
   const people = [...npcs,...archivedCandidates]
-  if (['wedding','weddingReply'].includes(source.pending) && !candidate && !prior) throw Error('Missing pending marriage candidate')
+  if (['wedding','weddingReply','arrangements'].includes(source.pending) && !candidate && !prior) throw Error('Missing pending marriage candidate')
   if (candidate) {
     if (!candidate.alive || candidate.partner !== null || spouse !== null) throw Error('Invalid active candidate: '+candidate.id)
     people.push(candidate)
@@ -149,6 +154,9 @@ export function collectPeople(source: State, prior?: Life, lostCandidate?: Kin):
       u.end = {year:world.year, cause:u.pair.includes(g.playerId) && marriage==='ended' ? 'ended' : 'widowed'}
     }
   }
+  function recordedCeremony(id:string) {
+    return world.negotiations?.find(row=>row.person===id && row.agreement?.receipt)?.agreement?.receipt?.year
+  }
   // In Stage 1 only accepted spouses enter the roster with the spouse role.
   // Retain proven former unions in roster order; an absent date stays unknown.
   if (!prior) {
@@ -156,7 +164,7 @@ export function collectPeople(source: State, prior?: Life, lostCandidate?: Kin):
       if (n.role !== '伴侣' || n.id === spouse) continue
       const id = required(n.id,'former spouse')
       const evidence = world.ledger.find(e=>(e.cause==='wedding' || e.cause==='weddingReply') && e.actors?.includes(id) && e.decision?.endsWith(':marry'))
-      g.marriages.push({ pair:[g.playerId,id], start:evidence?.year ?? null,
+      g.marriages.push({ pair:[g.playerId,id], start:recordedCeremony(id) ?? evidence?.year ?? null,
         end:{year:null,cause:n.alive && player.dead ? 'ended' : 'widowed'} })
     }
     // The old sibling partner is introduced exclusively by the sibling-union event.
@@ -170,7 +178,7 @@ export function collectPeople(source: State, prior?: Life, lostCandidate?: Kin):
     if (g.marriages.some(u=>!u.end && pair.every(id=>u.pair.includes(id)))) continue
     const evidence = pair.includes(g.playerId) && world.ledger.find(e=>(e.cause==='wedding' || e.cause==='weddingReply') &&
       e.decision?.endsWith(':marry') && pair.every(id=>e.actors?.includes(id)))
-    g.marriages.push({pair,start:prior ? world.year : (evidence ? evidence.year ?? null : null),end:null})
+    g.marriages.push({pair,start:prior ? world.year : ((pair.includes(g.playerId) ? recordedCeremony(pair.find(id=>id!==g.playerId)!) : undefined) ?? (evidence ? evidence.year : null) ?? null),end:null})
   }
   if (playerUnions(g).length !== unions || marriageSummary(g) !== marriage)
     throw Error('Unresolved legacy marriage history: '+marriage+' / '+unions)
@@ -257,12 +265,25 @@ export function validatePeople(s: Life) {
   const closed = new Set<string>()
   for (const [index,row] of (s.negotiations ?? []).entries()) {
     defined(row.person)
+    const a=row.agreement
+    if (a) {
+      if (row.result?.outcome!=='willing' || (!a.closed && (row.person!==s.candidateId || player.dead || index!==s.negotiations!.length-1)))
+        throw Error('Orphan mutual consent')
+      if (a.careFor) defined(a.careFor)
+      const receipt=a.receipt
+      if (receipt?.donor) defined(receipt.donor)
+      if (receipt && (![receipt.cash,receipt.gift].every(v=>Number.isSafeInteger(v) && v>=0) ||
+          ![2,6].includes(receipt.cash+receipt.gift) || Boolean(receipt.gift)!==Boolean(receipt.donor) ||
+          (!s.households[receipt.house] && s.closedHouses[receipt.house]===undefined)))
+        throw Error('Invalid ceremony payment')
+      if (Boolean(a.receipt)!==(a.closed==='married')) throw Error('Invalid ceremony receipt')
+    }
     if (s.people[row.person].kind !== 'relative' ||
       (row.contact === 'immediate' ? row.due !== null : row.due !== row.opened+(row.contact === 'meet' ? 1 : 2)))
       throw Error('Invalid marriage appointment')
     if (!row.result && (row.person !== s.candidateId || index !== s.negotiations!.length-1 || player.dead))
       throw Error('Orphan marriage appointment')
-    if (row.result && row.result.outcome !== 'willing') closed.add(row.person)
+    if ((row.result && row.result.outcome !== 'willing') || (a?.closed && a.closed !== 'married')) closed.add(row.person)
   }
   const complete = new Set<string>()
   function ancestry(id:string, chain:Set<string>) {

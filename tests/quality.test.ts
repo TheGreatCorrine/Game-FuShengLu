@@ -27,7 +27,7 @@ it('reopens negotiations after cooldown and prevents duplicate partners', () => 
   const next = decide(s, 'marry')
   expect(next.wedding.state).toBe('deferred')
   expect(eligible(next).some((e) => e.id === 'wedding')).toBe(false)
-  let retry = { ...next, age: 24, pending: 'wedding' }
+  let retry = { ...next, age: 24, pending: next.pending || 'wedding' }
   retry.households.birth.cash = 100
   for (let i = 0; i < 20; i++) {
     const result = decide(retry, 'marry')

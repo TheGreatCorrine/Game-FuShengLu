@@ -4,7 +4,6 @@ import { account, migrateHouseholds, moveResidence, openHouse } from '../src/eng
 import { household, inactiveHouse } from '../src/engine/economy.ts'
 import { joinFamily } from '../src/engine/family.ts'
 import { candidate } from '../src/engine/encounters.ts'
-import { homes } from '../src/data.ts'
 
 function legacyFixture() {
   const { households, ...state } = structuredClone(generate('archive'))
@@ -54,19 +53,19 @@ it('keeps every owner and private balance intact across repeated moves and a mis
   expect(s.households).toEqual(before)
 })
 
-it('attributes marriage endowments to their actual owners for all four first-union arrangements', () => {
+it('preserves existing property without granting a new endowment for all four first-union arrangements', () => {
   const arrangements = new Set<string>()
   for (let i=0; i<500 && arrangements.size<4; i++) {
     const s = generate('ownership'+i)
     const original = { cash: 21, debt: 9, assets: 2 }
     Object.assign(account(s),original)
     const spouse = candidate(s)
-    const grant = { cash: Math.floor(homes[spouse.background].coins/2), assets: 1, debt: 0 }
+    const grant = { cash: 0, assets: 0, debt: 0 }
     joinFamily(s,spouse)
     const elders = s.npcs.some(n=>n.id.startsWith('kin1elder'))
     arrangements.add(s.residence + String(elders))
     const expected = s.residence === 'birth' && !elders
-      ? { birth: {cash: original.cash+grant.cash, assets:3, debt:9} }
+      ? { birth: original }
       : { birth:original, [elders?'kin1':'independent']:grant }
     expect(s.households).toEqual(expected)
     expect(s.purse).toBe(0)

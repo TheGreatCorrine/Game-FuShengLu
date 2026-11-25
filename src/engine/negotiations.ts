@@ -9,7 +9,8 @@ export function appointment(s: Game) {
 }
 
 export function schedule(s: Game, person: Person, contact: 'meet' | 'terms') {
-  if (appointment(s) || currentCandidate(s)?.id !== person.id) throw Error('Invalid marriage appointment')
+  const previous = s.negotiations?.at(-1)?.agreement
+  if (appointment(s) || (previous && !previous.closed) || currentCandidate(s)?.id !== person.id) throw Error('Invalid marriage appointment')
   const delay = contact === 'meet' ? 1 : 2
   const history = s.negotiations ??= []
   history.push({person:person.id, opened:s.year, due:s.year+delay, contact})
@@ -35,6 +36,12 @@ const reasons: Record<ReplyOutcome,string> = {
   declined:'收到你的回话，知道这门婚事就此作罢。',
 }
 
+export function releaseCandidate(s: Game, n: Person, outcome: Exclude<ReplyOutcome,'willing'>) {
+  if (!canonical(s) && 'parents' in n) (s.archivedCandidates ??= []).push(n)
+  clearCandidate(s)
+  return n.name+reasons[outcome]
+}
+
 export function conclude(s: Game, n: Person, outcome: ReplyOutcome) {
   let row = appointment(s)
   if (!row) {
@@ -44,11 +51,7 @@ export function conclude(s: Game, n: Person, outcome: ReplyOutcome) {
   }
   if (n.id !== row.person) throw Error('Marriage reply from wrong person')
   row.result = {year:s.year,outcome}
-  if (outcome !== 'willing') {
-    if (!canonical(s) && 'parents' in n) (s.archivedCandidates ??= []).push(n)
-    clearCandidate(s)
-  }
-  return n.name+reasons[outcome]
+  return outcome === 'willing' ? n.name+reasons.willing : releaseCandidate(s,n,outcome)
 }
 
 export function respond(s: Game, n: Person, acute: string) {
