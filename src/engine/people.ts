@@ -36,7 +36,7 @@ function resolve(keys: Map<string,string>, key: string, field: string) {
   return id
 }
 
-function mapReferences<T extends Pick<State,'negotiations'|'loans'|'settlements'|'heads'|'promise'|'news'|'chronicle'|'ledger'>>(
+function mapReferences<T extends Pick<State,'annual'|'negotiations'|'loans'|'settlements'|'heads'|'promise'|'news'|'chronicle'|'ledger'>>(
   s: T, active: (key:string, field:string)=>string, historical: (key:string)=>string,
 ) {
   // Entries can be shared between chronicle and ledger. Translate each object once.
@@ -53,6 +53,11 @@ function mapReferences<T extends Pick<State,'negotiations'|'loans'|'settlements'
     if (a?.careFor) a.careFor=active(a.careFor,'agreement.careFor')
     if (a?.receipt?.donor) a.receipt.donor=active(a.receipt.donor,'receipt.donor')
   }
+  for (const r of s.annual?.receipts ?? []) {
+    r.target=active(r.target,'annual.target')
+    if(r.candidate) r.candidate=active(r.candidate,'annual.candidate')
+  }
+  for (const o of s.annual?.interviews ?? []) o.employer=active(o.employer,'annual.employer')
   for (const loan of s.loans) loan.debtor = active(loan.debtor,'loan.debtor')
   for (const record of s.settlements) {
     record.owner = active(record.owner,'settlement.owner')
@@ -232,7 +237,7 @@ export function legacyPeopleView(state: Life): State {
   Object.freeze(world.households)
   return withAccountViews({...world,...p,playerParentKeys:parentIds[playerId].map(key),spouse:partners.has(playerId)?key(partners.get(playerId)!):null,
     marriage:marriageSummary(graph),unions:playerUnions(graph).length,npcs:residentOrder.map(kin),
-    ...(world.negotiations?.length ? {exportedPersonKeys:legacyKeys} : {}),
+    ...(world.negotiations?.length || world.annual ? {exportedPersonKeys:legacyKeys} : {}),
     ...(archived.length ? {archivedCandidates:archived.map(kin)} : {}),
     candidate:candidateId ? kin(candidateId) : null})
 }
@@ -261,6 +266,22 @@ export function validatePeople(s: Life) {
     if (id===s.playerId) throw Error('Unexpected self attitude')
     for (const memory of s.towardPlayer[id].history) for (const actor of memory.actors)
       if (!actor.startsWith('unresolved:')) defined(actor)
+  }
+  if (s.annual) {
+    if (s.annual.year!==s.year) throw Error('Invalid action year')
+    const commands=new Set<string>(), used=new Map<number,number>()
+    for (const r of s.annual.receipts) {
+      defined(r.target)
+      if(r.candidate) defined(r.candidate)
+      const count=(used.get(r.year)??0)+1
+      if (!r.id || commands.has(r.id) || count>2 || r.year>s.year) throw Error('Invalid annual command history')
+      commands.add(r.id)
+      used.set(r.year,count)
+    }
+    for (const o of s.annual.interviews) {
+      defined(o.employer)
+      if(o.until!==o.year+1 || (o.status==='open' && (player.dead || o.until<s.year))) throw Error('Invalid interview term')
+    }
   }
   const closed = new Set<string>()
   for (const [index,row] of (s.negotiations ?? []).entries()) {

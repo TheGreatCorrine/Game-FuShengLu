@@ -3,6 +3,8 @@ import type { Action } from './data.ts'
 import type { PlayerObservation } from './engine/observation.ts'
 
 type Props = {
+  annual?: { year:number; left:number; choices:string[]; constraint:string; last?:string; act:(index:number)=>void; end:()=>void }
+
   observation: PlayerObservation
   confirm: (name:string) => void
   choose: (action:Action) => void
@@ -10,8 +12,10 @@ type Props = {
   skip: () => void
   restart: () => void
 }
-export function PlayerView({observation:s, confirm, choose, advance, skip, restart}: Props) {
+export function PlayerView({observation:s, confirm, choose, advance, skip, restart, annual}: Props) {
   const [name, rename] = useState('')
+  const [selection, select] = useState<{year:number;label:string}|null>(null)
+  const chosen = annual && selection?.year===annual.year ? annual.choices.indexOf(selection.label) : -1
   return (
     <>
       <header>
@@ -82,6 +86,19 @@ export function PlayerView({observation:s, confirm, choose, advance, skip, resta
                     {label}
                   </button>
                 ))}
+              </article>
+            ) : annual ? (
+              <article>
+                <h3>今年的打算 · 还可行动 {annual.left} 次</h3>
+                {annual.last && <p>{annual.last}</p>}
+                {annual.constraint && <p>{annual.constraint}</p>}
+                {chosen<0 ? annual.choices.map(label=><button key={label} onClick={()=>select({year:annual.year,label})}>{label}</button>) :
+                  <><p>{annual.choices[chosen]}。实际提出请求或赴约用一次行动。</p>
+                    <button onClick={()=>{select(null);annual.act(chosen)}}>确定前往</button>
+                    <button onClick={()=>select(null)}>再想想</button></>}
+                {!annual.choices.length && <p>眼下没有可托付的人或可赴的约。</p>}
+                <button onClick={annual.end}>结束本年行动</button>
+                <button onClick={skip}>略过主动行动，行至下次事件</button>
               </article>
             ) : !s.dead ? (
               <>

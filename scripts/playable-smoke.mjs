@@ -53,7 +53,9 @@ async function play(mode, url) {
     const decisions = []
     let married = false, widowed = false
     while (decisions.length < 100) {
-      await button('行至下一次抉择').click()
+      if (await button('行至下一次抉择').count()) await button('行至下一次抉择').click()
+      const skipOptional = button('略过主动行动，行至下次事件')
+      if (await skipOptional.count()) await skipOptional.click()
       if (await page.getByRole('heading',{name:/此生终章/}).count()) break
       const age = Number((await page.locator('section > small').first().innerText()).match(/(\d+) 岁/)[1])
       const choice = page.locator('article button').first()
