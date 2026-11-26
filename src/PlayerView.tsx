@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { Action } from './data.ts'
 import type { PlayerObservation } from './engine/observation.ts'
 
@@ -15,6 +15,7 @@ type Props = {
 export function PlayerView({observation:s, confirm, choose, advance, skip, restart, annual}: Props) {
   const [name, rename] = useState('')
   const [selection, select] = useState<{year:number;label:string}|null>(null)
+  const lastPointerConfirm = useRef<{time:number; x:number; y:number} | null>(null)
   const chosen = annual && selection?.year===annual.year ? annual.choices.indexOf(selection.label) : -1
   return (
     <>
@@ -58,7 +59,16 @@ export function PlayerView({observation:s, confirm, choose, advance, skip, resta
         </section>
       ) : (
         <>
-          <section>
+          <section onClickCapture={event => {
+            const last = lastPointerConfirm.current
+            lastPointerConfirm.current = null
+            // The second click can land on a replacement button and restart its click count.
+            if (last && event.detail > 0 && event.timeStamp - last.time <= 500 &&
+                Math.abs(event.clientX - last.x) <= 4 && Math.abs(event.clientY - last.y) <= 4) {
+              event.preventDefault()
+              event.stopPropagation()
+            }
+          }}>
             <small>
               {s.year}　·　{s.age} 岁
             </small>
@@ -94,7 +104,13 @@ export function PlayerView({observation:s, confirm, choose, advance, skip, resta
                 {annual.constraint && <p>{annual.constraint}</p>}
                 {chosen<0 ? annual.choices.map(label=><button key={label} onClick={()=>select({year:annual.year,label})}>{label}</button>) :
                   <><p>{annual.choices[chosen]}。实际提出请求或赴约用一次行动。</p>
-                    <button onClick={()=>{select(null);annual.act(chosen)}}>确定前往</button>
+                    <button onClick={event => {
+                      if (event.detail > 0) {
+                        lastPointerConfirm.current = { time:event.timeStamp, x:event.clientX, y:event.clientY }
+                      }
+                      select(null)
+                      annual.act(chosen)
+                    }}>确定前往</button>
                     <button onClick={()=>select(null)}>再想想</button></>}
                 {!annual.choices.length && <p>眼下没有可托付的人或可赴的约。</p>}
                 <button onClick={annual.end}>结束本年行动</button>
