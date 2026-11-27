@@ -161,6 +161,10 @@ export function PlayerView({observation:s, confirm, choose, advance, skip, resta
               )}
             </section>
           ))}
+          {s.contacts?.map(n=><details key={n.id}>
+            <summary>相识 · 布贩{n.name}</summary>
+            {n.history.map((line,i)=><p key={i}>{line}</p>)}
+          </details>)}
           <details>
             <summary>亲属 · {s.relatives.length}</summary>
             <p>

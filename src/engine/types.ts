@@ -67,6 +67,7 @@ export type Negotiation = {
 }
 export type State = {
   annual?: import("./annual-actions.ts").ActionYear
+  exportedContacts?: import("./employer.ts").Contact[]
   archivedCandidates?: Kin[]
   exportedPersonKeys?: Record<string,string>
   negotiations?: Negotiation[]

@@ -1,3 +1,4 @@
+import type { Contact } from './employer.ts'
 import { migrateHouseholds, validateHouseholds, withAccountViews } from './accounts.ts'
 import type { Kin, Memory, State } from './types.ts'
 
@@ -16,7 +17,7 @@ type Union = {
   end: { year: number | null; cause: 'widowed' | 'ended' } | null
 }
 type Graph = {
-  people: Record<PersonId, Relative | Protagonist>
+  people: Record<PersonId, Relative | Protagonist | Contact>
   legacyKeys: Record<PersonId, string>
   parentIds: Record<PersonId, PersonId[]>
   towardPlayer: Record<PersonId, Attitude>
@@ -27,7 +28,7 @@ type Graph = {
   nextPerson: number
 }
 type World = Omit<State, typeof playerFields[number] | 'playerParentKeys' | 'spouse' | 'candidate' | 'marriage' | 'unions' |
-  'exportedPersonKeys' | 'archivedCandidates' | 'npcs' | 'cash' | 'assets' | 'debt' | 'estates'>
+  'exportedContacts' | 'exportedPersonKeys' | 'archivedCandidates' | 'npcs' | 'cash' | 'assets' | 'debt' | 'estates'>
 export type Life = World & Graph
 
 function resolve(keys: Map<string,string>, key: string, field: string) {
@@ -85,7 +86,7 @@ export function marriageSummary(g: Graph): State['marriage'] {
 // Convert a detached command result. Older entities and closed unions carry forward.
 export function collectPeople(source: State, prior?: Life, lostCandidate?: Kin): Life {
   const snapshot = structuredClone(source)
-  const { npcs, exportedPersonKeys, archivedCandidates = [], candidate, spouse, marriage, unions, playerParentKeys, ...world } = snapshot
+  const { npcs, exportedContacts = [], exportedPersonKeys, archivedCandidates = [], candidate, spouse, marriage, unions, playerParentKeys, ...world } = snapshot
   const g: Graph = {
     playerId: prior?.playerId ?? 'p0', nextPerson: prior?.nextPerson ?? 1,
     people: { ...prior?.people }, legacyKeys: { ...prior?.legacyKeys },
@@ -144,6 +145,12 @@ export function collectPeople(source: State, prior?: Life, lostCandidate?: Kin):
     if (!external) g.residentOrder.push(id)
     if (n === candidate) g.candidateId = id
     if (partner !== null) required(partner,'partner')
+  }
+  for(const contact of exportedContacts) {
+    const id=required(contact.id,'contact')
+    if(encountered.has(contact.id)) throw Error('Duplicate exported contact')
+    encountered.add(contact.id)
+    g.people[id]={...contact,id,history:contact.history.map(e=>({...e,via:required(e.via,'contact.guide')}))}
   }
   mapReferences(world,required,historic)
 
@@ -231,13 +238,17 @@ export function legacyPeopleView(state: Life): State {
   }
   const archived = Object.keys(people).filter(id => id !== candidateId && people[id].kind === 'relative' &&
     !residentOrder.includes(id) && world.negotiations?.length)
+  const contacts=Object.values(people).filter((n):n is Contact=>n.kind==='contact').map(n=>({
+    ...n,id:key(n.id),history:n.history.map(e=>({...e,via:key(e.via)}))
+  }))
   mapReferences(world,key,historic)
   // Public compatibility projections cannot be used as a second account ledger.
   for (const book of Object.values(world.households)) Object.freeze(book)
   Object.freeze(world.households)
   return withAccountViews({...world,...p,playerParentKeys:parentIds[playerId].map(key),spouse:partners.has(playerId)?key(partners.get(playerId)!):null,
     marriage:marriageSummary(graph),unions:playerUnions(graph).length,npcs:residentOrder.map(kin),
-    ...(world.negotiations?.length || world.annual ? {exportedPersonKeys:legacyKeys} : {}),
+    ...(contacts.length || world.negotiations?.length || world.annual ? {exportedPersonKeys:legacyKeys} : {}),
+    ...(contacts.length ? {exportedContacts:contacts} : {}),
     ...(archived.length ? {archivedCandidates:archived.map(kin)} : {}),
     candidate:candidateId ? kin(candidateId) : null})
 }
@@ -272,7 +283,8 @@ export function validatePeople(s: Life) {
     const commands=new Set<string>(), used=new Map<number,number>()
     for (const r of s.annual.receipts) {
       defined(r.target)
-      if(r.candidate) defined(r.candidate)
+      if(r.candidate && s.people[r.candidate]?.kind!=='relative') throw Error('Invalid introduced candidate')
+      if(r.kind==='introduction' && s.people[r.target].kind!=='relative') throw Error('Invalid family intermediary')
       const count=(used.get(r.year)??0)+1
       if (!r.id || commands.has(r.id) || count>2 || r.year>s.year) throw Error('Invalid annual command history')
       commands.add(r.id)
@@ -280,6 +292,9 @@ export function validatePeople(s: Life) {
     }
     for (const o of s.annual.interviews) {
       defined(o.employer)
+      const employer=s.people[o.employer]
+      if(employer.kind==='contact' && !employer.history.some(e=>e.outcome==='invited' && e.opportunity===o.job && e.year===o.year))
+        throw Error('Missing contact invitation')
       if(o.until!==o.year+1 || (o.status==='open' && (player.dead || o.until<s.year))) throw Error('Invalid interview term')
     }
   }
@@ -290,9 +305,9 @@ export function validatePeople(s: Life) {
     if (a) {
       if (row.result?.outcome!=='willing' || (!a.closed && (row.person!==s.candidateId || player.dead || index!==s.negotiations!.length-1)))
         throw Error('Orphan mutual consent')
-      if (a.careFor) defined(a.careFor)
+      if (a.careFor && s.people[a.careFor]?.kind!=='relative') throw Error('Invalid family care recipient')
       const receipt=a.receipt
-      if (receipt?.donor) defined(receipt.donor)
+      if (receipt?.donor && s.people[receipt.donor]?.kind!=='relative') throw Error('Invalid family donor')
       if (receipt && (![receipt.cash,receipt.gift].every(v=>Number.isSafeInteger(v) && v>=0) ||
           ![2,6].includes(receipt.cash+receipt.gift) || Boolean(receipt.gift)!==Boolean(receipt.donor) ||
           (!s.households[receipt.house] && s.closedHouses[receipt.house]===undefined)))
@@ -314,16 +329,26 @@ export function validatePeople(s: Life) {
     chain.add(id)
     const parents = s.parentIds[id]
     if (!parents || new Set(parents).size !== parents.length) throw Error('Invalid parents: '+id)
-    for (const parent of parents) ancestry(parent,chain)
+    for (const parent of parents) {
+      if(s.people[parent]?.kind==='contact') throw Error('Contact in parentage')
+      ancestry(parent,chain)
+    }
     chain.delete(id)
     complete.add(id)
   }
   for (const id of ids) {
-    ancestry(id,new Set())
+    if(s.people[id].kind!=='contact') ancestry(id,new Set())
     const n = s.people[id]
     if ((n.kind==='player') !== (id===s.playerId)) throw Error('Unexpected protagonist: '+id)
     if (n.id !== id || !s.legacyKeys[id] || !/^p\d+$/.test(id) || Number(id.slice(1)) >= s.nextPerson)
       throw Error('Invalid stable identity: '+id)
+    if (n.kind === 'contact') {
+      if('money' in n || 'house' in n || 'purse' in n || roster.has(id) || id in s.parentIds || id in s.towardPlayer || Object.values(s.heads).includes(id) ||
+        s.loans.some(l=>l.debtor===id) || s.settlements.some(r=>r.owner===id || r.shares.some(h=>h.id===id)) ||
+        s.legacyKeys[id]!==n.shop || !n.history.length || n.history[0].outcome!=='introduced' ||
+        n.history.some(e=>s.people[e.via]?.kind!=='relative' || !e.opportunity || !e.text || e.year>s.year))
+        throw Error('Invalid social contact: '+id)
+    }
     if (n.kind === 'relative') {
       if (roster.has(id) !== (n.house !== null) || !s.towardPlayer[id]) throw Error('Invalid membership: '+id)
       if (n.alive && n.house === null && id !== s.candidateId && !closed.has(id)) throw Error('Untracked external person: '+id)
@@ -333,12 +358,13 @@ export function validatePeople(s: Life) {
   for (const u of s.marriages) {
     const [a,b] = u.pair
     defined(a); defined(b)
+    if(u.pair.some(id=>s.people[id].kind==='contact')) throw Error('Contact in union')
     if (a===b) throw Error('Self marriage')
     if (!u.end) {
       if (partnered.has(a)||partnered.has(b)) throw Error('Conflicting active marriage')
       for (const id of u.pair) {
         const n=s.people[id]
-        if (n.kind==='player' ? player.dead : !n.alive || n.house===null) throw Error('Invalid active spouse: '+id)
+        if (n.kind==='player' ? player.dead : n.kind!=='relative' || !n.alive || n.house===null) throw Error('Invalid active spouse: '+id)
         partnered.add(id)
       }
     }

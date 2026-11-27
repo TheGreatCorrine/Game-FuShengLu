@@ -31,7 +31,7 @@ export function register(s: Game, template: Kin, parents: string[], external = f
   const id = 'p' + s.nextPerson
   if (Object.hasOwn(s.people,id) || Object.values(s.legacyKeys).includes(key))
     throw Error('Duplicate person: '+key)
-  if (parents.some(id => !s.people[id])) throw Error('Unknown parent of '+key)
+  if (parents.some(id => !s.people[id] || s.people[id].kind==='contact')) throw Error('Unknown parent of '+key)
   s.nextPerson++
   const n: Relative = {...facts, id, kind:'relative', house: external ? null : facts.house}
   s.people[id] = n
@@ -94,6 +94,7 @@ export function formUnion(s: Game, first: string, second: string) {
   if (first === second || partnerOf(s,first) || partnerOf(s,second))
     throw Error('Invalid union: '+first+' / '+second)
   if (canonical(s)) {
+    if ([first,second].some(id=>s.people[id]?.kind==='contact')) throw Error('Contact in union')
     s.marriages.push({pair:[first,second],start:s.year,end:null})
   } else {
     for (const [a,b] of [[first,second],[second,first]]) {

@@ -1,3 +1,4 @@
+import { meetTrader, traderChoices, visitTrader, settleTrader } from './employer.ts'
 import { eligible, bindCandidate } from '../content/western-han/events.ts'
 import { marriageSummary } from './people.ts'
 import { rules } from '../data.ts'
@@ -11,7 +12,7 @@ type Kind = 'introduction' | 'inquiry' | 'interview'
 export type ActionChoice = { kind: Kind; target: string; subject: string; label: string }
 export type AnnualCommand = Pick<ActionChoice,'kind'|'target'|'subject'> & { id:string; year:number }
 type Receipt = AnnualCommand & { accepted:boolean; text:string; candidate?:string }
-type Interview = { employer:string; job:string; year:number; until:number; status:'open'|'attended'|'expired'|'interrupted' }
+export type Interview = { employer:string; job:string; year:number; until:number; status:'open'|'attended'|'expired'|'interrupted' }
 export type ActionYear = { year:number; closed:boolean; receipts:Receipt[]; interviews:Interview[] }
 
 export function actionsLeft(s: Life) {
@@ -40,6 +41,8 @@ export function settleInterviews(s:Life) {
   const p=protagonist(s)
   for(const o of s.annual?.interviews??[]){
     if(o.status!=='open') continue
+    const person=s.people[o.employer]
+    if(person?.kind==='contact') { settleTrader(s,person,o); continue }
     if(p.dead || !reachable(s,o.employer)) o.status='interrupted'
     else if(s.year>o.until) o.status='expired'
     else continue
@@ -93,7 +96,7 @@ export function availableActions(s:Life): ActionChoice[] {
       offers.push({kind:'inquiry',target:id,subject:job,label:'随'+named+'到本地集市问工：'+job})
     }
   }
-  return offers
+  return offers.concat(traderChoices(s))
 }
 export function submitAnnual(s:Life,c:AnnualCommand): {state:Life;result:Readonly<Receipt>} {
   const saved=s.annual?.receipts.find(r=>r.id===c.id)
@@ -104,30 +107,39 @@ export function submitAnnual(s:Life,c:AnnualCommand): {state:Life;result:Readonl
   }
   if(!c.id.trim() || c.year!==s.year || !availableActions(s).some(o=>o.target===c.target && o.kind===c.kind && o.subject===c.subject))
     throw Error('这项行动已不可用')
-  const state=structuredClone(s), a=state.annual!, p=protagonist(state), n=reachable(state,c.target)!
-  const draw=random(state.seed,['annual',c.year,c.kind,keyFor(state,n.id),c.subject].join('/'))
+  const state=structuredClone(s), a=state.annual!, p=protagonist(state)
+  const person=state.people[c.target]
   let accepted=true, text=''
-  if(c.kind==='introduction'){
-    accepted=draw<0.45+0.25*state.towardPlayer[n.id].trust
-    if(accepted){
-      bindCandidate(state)
-      const candidate=currentCandidate(state)!
-      candidate.money=0
-      state.pending='wedding'
-      state.wedding.state='attempted'
-      text=n.name+'替你约到'+candidate.name+'，你们还得各自拿主意。'
-    }else text=n.name+(state.households[p.residence].debt?'说家里还欠着钱，想先料理家计。':'说眼下没有合适的人可介绍。')
-  }else if(c.kind==='inquiry'){
-    accepted=draw<0.6
-    if(accepted) a.interviews.push({employer:n.id,job:c.subject,year:s.year,until:s.year+1,status:'open'})
-    text=n.name+(accepted?'约你最迟明年年底到集市面谈「'+c.subject+'」，届时再议。':'说「'+c.subject+'」眼下已有人手，今年不再招人。')
-  }else{
-    const o=a.interviews.find(o=>o.status==='open' && o.employer===n.id && o.job===c.subject)!
-    o.status='attended'
-    text='你依约和'+n.name+'谈了「'+o.job+'」的活计，尚未约定开工或工钱。'
+  if(person.kind==='contact') {
+    const visit=visitTrader(state,person,c)
+    accepted=visit.accepted
+    text=visit.text
+  }else {
+    const n=reachable(state,c.target)!
+    const draw=random(state.seed,['annual',c.year,c.kind,keyFor(state,n.id),c.subject].join('/'))
+    if(c.kind==='introduction'){
+      accepted=draw<0.45+0.25*state.towardPlayer[n.id].trust
+      if(accepted){
+        bindCandidate(state)
+        const candidate=currentCandidate(state)!
+        candidate.money=0
+        state.pending='wedding'
+        state.wedding.state='attempted'
+        text=n.name+'替你约到'+candidate.name+'，你们还得各自拿主意。'
+      }else text=n.name+(state.households[p.residence].debt?'说家里还欠着钱，想先料理家计。':'说眼下没有合适的人可介绍。')
+    }else if(c.kind==='inquiry'){
+      accepted=draw<0.6
+      if(accepted) a.interviews.push({employer:n.id,job:c.subject,year:s.year,until:s.year+1,status:'open'})
+      text=n.name+(accepted?'约你最迟明年年底到集市面谈「'+c.subject+'」，届时再议。':'说「'+c.subject+'」眼下已有人手，今年不再招人。')
+    }else{
+      const o=a.interviews.find(o=>o.status==='open' && o.employer===n.id && o.job===c.subject)!
+      o.status='attended'
+      text='你依约和'+n.name+'谈了「'+o.job+'」的活计，尚未约定开工或工钱。'
+    }
+    if(c.kind==='interview') text+=meetTrader(state,n,c.subject)
   }
   const result:Receipt={...(c.kind==='introduction' && accepted ? {candidate:state.candidateId!} : {}),id:c.id,year:c.year,kind:c.kind,target:c.target,subject:c.subject,accepted,text}
   a.receipts.push(result)
-  state.chronicle.push({age:p.age,year:s.year,text,actors:[p.id,n.id]})
+  state.chronicle.push({age:p.age,year:s.year,text,actors:[p.id,c.target]})
   return {state,result:{...result}}
 }

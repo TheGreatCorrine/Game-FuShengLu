@@ -38,6 +38,9 @@ export function observePlayer(life: Life) {
     news: publicRows(life.news), chronicle: publicRows(life.chronicle),
     residence: p.residence === 'birth' ? '居于出生之家' : p.residence === 'independent' ? '已另立门户' : '与姻亲同住',
     marriage: {never:'未婚',married:'已婚',widowed:'丧偶',remarried:'再婚',ended:'此生婚姻已终'}[marriage],
+    contacts: Object.values(life.people).flatMap(n=>n.kind==='contact' ? [{
+      id:n.id,name:n.name,history:n.history.filter(e=>e.outcome!=='applied').map(e=>date(e.year)+' · '+e.location+' · '+e.text)
+    }] : []),
     relatives: life.residentOrder.map(id => {
       const n = life.people[id]
       if (n.kind !== 'relative') throw Error('Invalid resident: ' + id)
